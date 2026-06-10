@@ -12,20 +12,30 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['icon.svg', 'favicon.ico'],
+        includeAssets: ['icon.svg', 'favicon.ico', 'icon-192x192.png', 'icon-512x512.png'],
         manifest: {
           name: 'SuinoSaúde',
           short_name: 'SuinoSaúde',
           description: 'Aplicativo para saúde e manejo de suínos',
-          theme_color: '#facc15',
-          background_color: '#ffffff',
+          theme_color: '#0F172A',
+          background_color: '#0F172A',
           display: 'standalone',
           start_url: '/',
           icons: [
             {
-              src: 'icon.svg',
-              sizes: '192x192 512x512',
-              type: 'image/svg+xml',
+              src: 'icon-192x192.png',
+              sizes: '192x192',
+              type: 'image/png'
+            },
+            {
+              src: 'icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png'
+            },
+            {
+              src: 'icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
               purpose: 'any maskable'
             }
           ]
