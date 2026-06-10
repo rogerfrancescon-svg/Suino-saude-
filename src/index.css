@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-brand-primary: #3B82F6;
+  --color-brand-primary-light: #60A5FA;
+  --color-brand-success: #22C55E;
+  --color-brand-success-light: #4ADE80;
+  --color-brand-warn: #F59E0B;
+  --color-brand-danger: #EF4444;
+}
+
+:root {
+  --bg: #0F172A;
+  --surface: #1E293B;
+  --surface-hover: #243247;
+  --surface-active: #334155;
+  --border: #334155;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --text-dim: #64748B;
+  --accent-success: #22C55E;
+  --accent-primary: #3B82F6;
+  --accent-warn: #F59E0B;
+  --accent-danger: #EF4444;
+}
+
+.light {
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-hover: #F1F5F9;
+  --surface-active: #E2E8F0;
+  --border: #E2E8F0;
+  --text-main: #0F172A;
+  --text-muted: #475569;
+  --text-dim: #94A3B8;
+  --accent-success: #22C55E;
+  --accent-primary: #3B82F6;
+  --accent-warn: #F59E0B;
+  --accent-danger: #EF4444;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-main);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.field-input {
+  background-color: #21262d;
+  border: 1px solid var(--border);
+}
+
+.light .field-input {
+  background-color: #f6f8fa;
+}
+
