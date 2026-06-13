@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { VisitData } from '../types';
-import { formatDateBR } from './utils';
+import { formatDateBR, getIdealTempRange } from './utils';
 
 // Extending jsPDF with autotable types
 declare module 'jspdf' {
@@ -33,7 +33,6 @@ export function exportToPDF(records: VisitData[]) {
     doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA — SUINOSAÚDE PRO', margin, 11);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text('SISTEMA ESPECIALISTA DE MONITORAMENTO DE PRODUTORES', margin, 17);
     doc.text('Data da Visita: ' + formatDateBR(d.date), W - margin, 17, { align: 'right' });
     
     if (records.length > 1) {
@@ -111,7 +110,8 @@ export function exportToPDF(records: VisitData[]) {
       
       if (hasTemp) {
         const tempVal = Number(d.temp);
-        envAnalysis.push(['Temperatura (°C)', `${tempVal}°C`, '18 - 28°C', (tempVal >= 18 && tempVal <= 28) ? 'CONFORME' : 'FORA DA FAIXA']);
+        const { min, max, label } = getIdealTempRange(d.phase || '', d.date, d.housingDate);
+        envAnalysis.push(['Temperatura (°C)', `${tempVal}°C`, label, (tempVal >= min && tempVal <= max) ? 'CONFORME' : 'FORA DA FAIXA']);
       }
       if (hasHum) {
         const humVal = Number(d.humidity);
@@ -237,12 +237,6 @@ export function exportToPDF(records: VisitData[]) {
       y += (notesLines.length * 4) + 4;
     }
 
-    // Signature Line
-    y = H - 45;
-    doc.line(W/2 - 40, y, W/2 + 40, y);
-    doc.setFontSize(8);
-    doc.text('Assinatura do Técnico / Responsável', W/2, y + 4, { align: 'center' });
-    
     // Professional Disclaimer
     doc.setFontSize(6.5);
     doc.setTextColor(150, 150, 150);
@@ -261,27 +255,40 @@ export function exportToExcel(records: VisitData[]) {
   const wb = XLSX.utils.book_new();
   
   // Sheet 1: Dashboard / Main Records
-  const dashboardData = records.map(d => ({
-    Cliente: d.producer,
-    Produtor: d.farm,
-    Lote: d.batch || '',
-    Data: formatDateBR(d.date),
-    Fase: d.phase,
-    Animais_Total: d.totalAnimals,
-    Score_Geral: Number(d.results.score.toFixed(2)),
-    Status: d.results.scoreStatus,
-    Temp_C: d.temp && d.temp.trim() !== '' ? Number(d.temp) : null,
-    Umidade_P: d.humidity && d.humidity.trim() !== '' ? Number(d.humidity) : null,
-    CO2_ppm: d.co2 && d.co2.trim() !== '' ? Number(d.co2) : null,
-    Tosse_P: Number(d.results.cFreq.toFixed(2)),
-    Espirro_P: Number(d.results.sFreq.toFixed(2)),
-    Diarreia_Liquida_P: Number(d.results.liqFreq.toFixed(2)),
-    Mortalidade_P: Number(d.results.mortalityRate.toFixed(2)),
-    Meta_Mortalidade_P: d.results.mortalityMeta > 0 ? Number(d.results.mortalityMeta.toFixed(2)) : null,
-    Racao: d.feed,
-    Medicatorio: d.meds,
-    Observacoes: d.notes || ''
-  }));
+  const dashboardData = records.map(d => {
+    let ageDays = 0;
+    if (d.housingDate && d.date) {
+      const hd = new Date(d.housingDate + 'T00:00:00');
+      const vd = new Date(d.date + 'T00:00:00');
+      ageDays = Math.floor((vd.getTime() - hd.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    return {
+      Cliente: d.producer,
+      Produtor: d.farm,
+      Lote: d.batch || '',
+      Data_Visita: formatDateBR(d.date),
+      Data_Alojamento: d.housingDate ? formatDateBR(d.housingDate) : '',
+      Idade_Lote_Dias: ageDays > 0 ? ageDays : '',
+      Fase: d.phase,
+      Animais_Alojados: d.totalAnimals,
+      Mortalidade_Numero: d.mortality || 0,
+      Score_Geral: Number(d.results.score.toFixed(2)),
+      Status: d.results.scoreStatus,
+      Mortalidade_Atual_P: Number(d.results.mortalityRate.toFixed(2)),
+      Mortalidade_Projetada_P: Number(d.results.projectedMortalityRate.toFixed(2)),
+      Meta_Mortalidade_P: d.results.mortalityMeta > 0 ? Number(d.results.mortalityMeta.toFixed(2)) : null,
+      Tosse_P: Number(d.results.cFreq.toFixed(2)),
+      Espirro_P: Number(d.results.sFreq.toFixed(2)),
+      Diarreia_Liquida_P: Number(d.results.liqFreq.toFixed(2)),
+      Temp_C: d.temp && d.temp.trim() !== '' ? Number(d.temp) : null,
+      Umidade_P: d.humidity && d.humidity.trim() !== '' ? Number(d.humidity) : null,
+      CO2_ppm: d.co2 && d.co2.trim() !== '' ? Number(d.co2) : null,
+      Racao_Agua: d.feed,
+      Medicatorio: d.meds,
+      Observacoes: d.notes || ''
+    };
+  });
   const wsDash = XLSX.utils.json_to_sheet(dashboardData);
   XLSX.utils.book_append_sheet(wb, wsDash, 'Resumo do Lote');
 
@@ -291,13 +298,13 @@ export function exportToExcel(records: VisitData[]) {
     Cliente: d.producer,
     Produtor: d.farm,
     Lote: d.batch || '',
-    Animais_Avaliados: d.totalAnimals,
-    Tosses: d.counts.cough,
-    Espirros: d.counts.sneeze,
+    Fase: d.phase,
+    Animais_Alojados: d.totalAnimals,
+    Tosses_Baias: d.counts.cough,
+    Espirros_Baias: d.counts.sneeze,
     Fecal_E1_Normais: d.results.e1,
     Fecal_E2_Pastosas: d.counts.e2,
     Fecal_E3_Liquidas: d.counts.e3,
-    Duracao_Quadro: d.duration,
     Mortos: d.mortality || 0
   }));
   const wsRaw = XLSX.utils.json_to_sheet(rawData);
@@ -348,6 +355,12 @@ export function exportToExcel(records: VisitData[]) {
       const t = hasT ? Number(d.temp) : null;
       const h = hasH ? Number(d.humidity) : null;
       const c = hasC ? Number(d.co2) : null;
+
+      let tempStatus: string | null = null;
+      if (hasT && t !== null) {
+        const { min, max } = getIdealTempRange(d.phase || '', d.date, d.housingDate);
+        tempStatus = (t >= min && t <= max) ? 'CONFORME' : 'FORA DA FAIXA';
+      }
       
       return {
         Data: formatDateBR(d.date),
@@ -355,7 +368,7 @@ export function exportToExcel(records: VisitData[]) {
         Produtor: d.farm,
         Lote: d.batch || '',
         'Temperatura (°C)': t,
-        'Status Temperatura': hasT ? ((t! >= 18 && t! <= 28) ? 'CONFORME' : 'FORA DA FAIXA') : null,
+        'Status Temperatura': tempStatus,
         'Umidade (%)': h,
         'Status Umidade': hasH ? ((h! >= 55 && h! <= 75) ? 'CONFORME' : 'FORA DA FAIXA') : null,
         'CO2 (ppm)': c,
@@ -375,8 +388,8 @@ export function exportToExcel(records: VisitData[]) {
     ['Espirro Médio', '10%', 'Sugestivo de rinite atrófica progressiva.'],
     ['Diarreia Líquida (E3)', '5%', 'Nível de intervenção imediata.'],
     ['CO2', '2500 ppm', 'Limite para manutenção da qualidade respiratória.'],
-    ['Temperatura', '18-28 °C', 'Faixa de conforto térmico geral para suínos.'],
-    ['Umidade', '55-75%', 'Ideal para evitar proliferação de patógenos.']
+    ['Temperatura', '16-30 °C', 'Varia conforme a fase (Maternidade>Creche>Terminação).'],
+    ['Umidade', '50-75%', 'Ideal para evitar proliferação de patógenos.']
   ];
   const wsRef = XLSX.utils.aoa_to_sheet(refData);
   XLSX.utils.book_append_sheet(wb, wsRef, 'Referencias Tecnicas');

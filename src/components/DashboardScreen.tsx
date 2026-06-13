@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { VisitData } from '../types';
 import { calculateVisitResults } from '../lib/scoring';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -6,7 +6,6 @@ import { Users, AlertTriangle, Activity, Wind, Beaker, ChevronDown, Sparkles, Fi
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { toPng } from 'html-to-image';
-import { jsPDF } from 'jspdf';
 
 interface DashboardScreenProps {
   history: VisitData[];
@@ -24,6 +23,43 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
   const [search, setSearch] = useState('');
   const [selectedProducer, setSelectedProducer] = useState<(VisitData & { trend?: number }) | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [viewMode, setViewMode] = useState<'dashboard' | 'preview'>('dashboard');
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [expandedMort, setExpandedMort] = useState(false);
+  const [expandedResp, setExpandedResp] = useState(false);
+  const [expandedEnt, setExpandedEnt] = useState(false);
+  const [expandedRanking, setExpandedRanking] = useState(false);
+  const [expandedTable, setExpandedTable] = useState(false);
+
+  const availableProducers = useMemo(() => 
+    Array.from(new Set(history.map(v => v.producer))).filter(Boolean).sort(),
+  [history]);
+
+  const availableFarms = useMemo(() => 
+    Array.from(new Set(history
+      .filter(v => producerFilter === 'Todos' || v.producer === producerFilter)
+      .map(v => v.farm)
+    )).filter(Boolean).sort(),
+  [history, producerFilter]);
+
+  const availableBatches = useMemo(() => 
+    Array.from(new Set(history
+      .filter(v => (producerFilter === 'Todos' || v.producer === producerFilter) && (farmFilter === 'Todos' || v.farm === farmFilter))
+      .map(v => v.batch)
+    )).filter(Boolean).sort(),
+  [history, producerFilter, farmFilter]);
+
+  useEffect(() => {
+    if (farmFilter !== 'Todos' && !availableFarms.includes(farmFilter)) {
+      setFarmFilter('Todos');
+    }
+  }, [availableFarms, farmFilter]);
+
+  useEffect(() => {
+    if (batchFilter !== 'Todos' && !availableBatches.includes(batchFilter)) {
+      setBatchFilter('Todos');
+    }
+  }, [availableBatches, batchFilter]);
 
   // Filter and compute trends
   const { latestByProducer, filteredHistory } = useMemo(() => {
@@ -88,6 +124,10 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
       setIsExporting(true);
       const dashboardElement = document.getElementById('executive-dashboard');
       if (dashboardElement) {
+        dashboardElement.classList.add('export-mode');
+        
+        await new Promise(r => setTimeout(r, 400)); // allow browser to repaint layout fully
+
         const elementsToHide = dashboardElement.querySelectorAll('button');
         elementsToHide.forEach(el => {
           if (el.textContent === 'Exportar' || el.textContent === 'Limpar' || el.textContent === 'X') {
@@ -99,47 +139,39 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
           pixelRatio: 2,
           backgroundColor: '#0F172A',
           skipFonts: false,
+          width: dashboardElement.scrollWidth,
+          height: dashboardElement.scrollHeight,
+          style: {
+            transform: 'none'
+          }
         });
 
         elementsToHide.forEach(el => {
           (el as HTMLElement).style.opacity = '1';
         });
 
-        const pdf = new jsPDF({
-          orientation: dashboardElement.offsetWidth > dashboardElement.offsetHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: 'a4',
-        });
-        
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        
-        const imgProps = pdf.getImageProperties(imgData);
-        const imgWidth = pdfWidth;
-        const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
-        
-        let heightLeft = imgHeight;
-        let position = 0;
+        dashboardElement.classList.remove('export-mode');
 
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pdfHeight;
-        }
-
-        const dateStr = new Date().toISOString().split('T')[0];
-        pdf.save(`Painel_BI_Sanitario_${dateStr}.pdf`);
+        setPreviewImage(imgData);
+        setViewMode('preview');
       }
     } catch (err) {
       console.error('Failed to export dashboard', err);
       alert('Erro ao gerar exportação: ' + (err instanceof Error ? err.message : 'Erro desconhecido.'));
     } finally {
       setIsExporting(false);
+      const dbMode = document.getElementById('executive-dashboard');
+      if (dbMode) dbMode.classList.remove('export-mode');
     }
+  };
+
+  const handleDownloadPreview = () => {
+    if (!previewImage) return;
+    const dateStr = new Date().toISOString().split('T')[0];
+    const link = document.createElement('a');
+    link.download = `Painel_BI_Sanitario_${dateStr}.png`;
+    link.href = previewImage;
+    link.click();
   };
 
   const kpis = useMemo(() => {
@@ -235,11 +267,52 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
     setSelectedProducer(prod);
   };
 
+  if (viewMode === 'preview' && previewImage) {
+    return (
+      <div className="min-h-screen bg-[#0F172A] text-slate-50 font-sans p-4 md:p-6 pb-20 flex flex-col">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-5 mb-6 bg-[#1E293B] p-4 lg:p-5 rounded-xl border border-slate-700 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+              <Download size={24} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-white leading-none">Pré-visualização da Exportação</h1>
+              <p className="text-xs text-slate-400 mt-1 uppercase tracking-wider font-semibold">Dashboard Completo Gerado</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => { setViewMode('dashboard'); setPreviewImage(null); }}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              Voltar ao Dashboard
+            </button>
+            <button
+              onClick={handleDownloadPreview}
+              className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-lg shadow-green-600/20"
+            >
+              <Download size={16} />
+              Salvar Imagem
+            </button>
+          </div>
+        </header>
+
+        <div className="flex-1 bg-[#1E293B] border border-slate-700 rounded-xl p-4 overflow-auto custom-scrollbar flex justify-center items-start shadow-inner">
+          <img 
+            src={previewImage} 
+            alt="Dashboard Preview" 
+            className="w-full max-w-5xl h-auto shadow-2xl rounded-lg outline outline-1 outline-slate-600" 
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div id="executive-dashboard" className="min-h-screen bg-[#0F172A] text-slate-50 font-sans p-4 md:p-6 pb-20">
       
       {/* Global Header */}
-      <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 mb-8 bg-[#1E293B] p-4 lg:p-5 rounded-xl border border-slate-700 shadow-xl">
+      <header className="export-layout-header flex flex-col xl:flex-row xl:items-center justify-between gap-5 mb-8 bg-[#1E293B] p-4 lg:p-5 rounded-xl border border-slate-700 shadow-xl">
         <div className="flex items-center gap-3 shrink-0">
           <div className="w-10 h-10 rounded-lg bg-green-500/20 text-green-500 flex items-center justify-center">
             <ShieldCheck size={24} />
@@ -260,8 +333,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 onChange={(e) => setProducerFilter(e.target.value)}
                 className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
               >
-                <option>Todos</option>
-                {Array.from(new Set(history.map(v => v.producer))).sort().map(p => (
+                <option value="Todos">Todos</option>
+                {availableProducers.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -275,8 +348,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 onChange={(e) => setFarmFilter(e.target.value)}
                 className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
               >
-                <option>Todos</option>
-                {Array.from(new Set(history.map(v => v.farm).filter(Boolean))).sort().map(p => (
+                <option value="Todos">Todos</option>
+                {availableFarms.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -290,8 +363,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 onChange={(e) => setBatchFilter(e.target.value)}
                 className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
               >
-                <option>Todos</option>
-                {Array.from(new Set(history.map(v => v.batch).filter(Boolean))).sort().map(p => (
+                <option value="Todos">Todos</option>
+                {availableBatches.map(p => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </select>
@@ -346,7 +419,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
       </header>
 
       {/* Row 1: KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+      <div className="export-layout-row1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+
         <KPICard title="Clientes" val={kpis.total} sub="100% ativos" icon={<Users size={16} />} color="text-green-500" bg="bg-green-500/10" border="border-green-500/20" />
         
         <div className="bg-[#1E293B] border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden group hover:border-slate-600 transition-colors flex flex-col justify-between">
@@ -393,7 +467,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
       </div>
 
       {/* Row 2: Charts & Ranks */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      <div className="export-layout-row2 grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         
         {/* Panel 1 */}
         <div className="bg-[#1E293B] border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col">
@@ -460,7 +534,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 </tr>
               </thead>
               <tbody>
-                {ranking.map((p) => (
+                {(expandedRanking ? ranking : ranking.slice(0, 5)).map((p) => (
                   <tr key={p.id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => toggleProducerPanel(p)}>
                     <td className="py-2.5 px-3">
                       <span className={cn(
@@ -490,6 +564,30 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                     </td>
                   </tr>
                 ))}
+                {!expandedRanking && ranking.length > 5 && (
+                  <tr>
+                    <td colSpan={4} className="py-1 pt-3 text-center border-b border-slate-700/50">
+                      <button 
+                        onClick={() => setExpandedRanking(true)}
+                        className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-200 transition-colors py-1 px-4 rounded-full border border-slate-600 hover:bg-slate-700"
+                      >
+                        Ver mais +{ranking.length - 5}
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {expandedRanking && ranking.length > 5 && (
+                  <tr>
+                    <td colSpan={4} className="py-1 pt-3 text-center border-b border-slate-700/50">
+                      <button 
+                        onClick={() => setExpandedRanking(false)}
+                        className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-200 transition-colors py-1 px-4 rounded-full border border-slate-600 hover:bg-slate-700"
+                      >
+                        Ver menos
+                      </button>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -533,7 +631,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
       </div>
 
       {/* Row 3: Main Table & Sideline */}
-      <div className="flex flex-col xl:flex-row gap-6">
+      <div className="export-layout-row3 flex flex-col xl:flex-row gap-6">
         
         {/* Smart Table */}
         <div className="flex-1 bg-[#1E293B] border border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col">
@@ -581,7 +679,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
-                {tableData.map(p => {
+                {(expandedTable ? tableData : tableData.slice(0, 5)).map(p => {
                   const r = p.results!;
                   const isCrit = r.scoreStatus === 'Crítico';
                   return (
@@ -661,6 +759,30 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                     </tr>
                   )
                 })}
+                {!expandedTable && tableData.length > 5 && (
+                  <tr>
+                    <td colSpan={7} className="py-3 text-center transition-colors">
+                      <button 
+                        onClick={() => setExpandedTable(true)}
+                        className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-200 py-1.5 px-6 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors"
+                      >
+                        Ver mais +{tableData.length - 5}
+                      </button>
+                    </td>
+                  </tr>
+                )}
+                {expandedTable && tableData.length > 5 && (
+                  <tr>
+                    <td colSpan={7} className="py-3 text-center transition-colors">
+                      <button 
+                        onClick={() => setExpandedTable(false)}
+                        className="text-[10px] uppercase font-bold text-slate-400 hover:text-slate-200 py-1.5 px-6 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors"
+                      >
+                        Ver menos
+                      </button>
+                    </td>
+                  </tr>
+                )}
                 {tableData.length === 0 && (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-slate-500 text-sm">
@@ -698,8 +820,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                           <span className="text-white font-bold">{mortalidadeAlta.length} {mortalidadeAlta.length === 1 ? 'lote apresenta' : 'lotes apresentam'}</span> mortalidade acima da meta.
                         </p>
                         {mortalidadeAlta.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {mortalidadeAlta.map(p => (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {(expandedMort ? mortalidadeAlta : mortalidadeAlta.slice(0, 3)).map(p => (
                               <button 
                                 key={p.id}
                                 onClick={() => setFarmFilter(p.farm!)}
@@ -708,6 +830,11 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                                 {p.farm}
                               </button>
                             ))}
+                            {!expandedMort && mortalidadeAlta.length > 3 && (
+                              <button onClick={() => setExpandedMort(true)} className="text-[10px] text-slate-400 hover:text-slate-200 px-1 font-medium transition-colors">
+                                Ver mais +{mortalidadeAlta.length - 3}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -720,8 +847,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                           Desafio respiratório detectado em <span className="text-white font-bold">{riscoResp.length} {riscoResp.length === 1 ? 'produtor' : 'produtores'}</span>.
                         </p>
                         {riscoResp.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {riscoResp.map(p => (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {(expandedResp ? riscoResp : riscoResp.slice(0, 3)).map(p => (
                               <button 
                                 key={p.id}
                                 onClick={() => setFarmFilter(p.farm!)}
@@ -730,6 +857,11 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                                 {p.farm}
                               </button>
                             ))}
+                            {!expandedResp && riscoResp.length > 3 && (
+                              <button onClick={() => setExpandedResp(true)} className="text-[10px] text-slate-400 hover:text-slate-200 px-1 font-medium transition-colors">
+                                Ver mais +{riscoResp.length - 3}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
@@ -742,8 +874,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                           Desafio entérico agudo detectado em <span className="text-white font-bold">{riscoEnterico.length} {riscoEnterico.length === 1 ? 'produtor' : 'produtores'}</span>.
                         </p>
                         {riscoEnterico.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {riscoEnterico.map(p => (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            {(expandedEnt ? riscoEnterico : riscoEnterico.slice(0, 3)).map(p => (
                               <button 
                                 key={p.id}
                                 onClick={() => setFarmFilter(p.farm!)}
@@ -752,6 +884,11 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                                 {p.farm}
                               </button>
                             ))}
+                            {!expandedEnt && riscoEnterico.length > 3 && (
+                              <button onClick={() => setExpandedEnt(true)} className="text-[10px] text-slate-400 hover:text-slate-200 px-1 font-medium transition-colors">
+                                Ver mais +{riscoEnterico.length - 3}
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

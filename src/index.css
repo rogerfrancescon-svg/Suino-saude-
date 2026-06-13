@@ -62,3 +62,76 @@ body {
   background-color: #f6f8fa;
 }
 
+/* Export Mode Overrides for Full-Page Visual Render */
+.export-mode {
+  width: 1920px !important;
+  height: 1080px !important;
+  max-width: none !important;
+  max-height: none !important;
+  padding: 40px 60px !important;
+  background-color: #0F172A !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  gap: 24px !important;
+}
+
+.export-mode > * {
+  margin-bottom: 0 !important;
+}
+
+.export-mode .export-layout-header {
+  flex-shrink: 0;
+  padding: 16px 24px !important;
+}
+
+.export-mode .export-layout-row1 {
+  flex-shrink: 0;
+  gap: 16px !important;
+}
+
+.export-mode .export-layout-row2 {
+  flex-shrink: 0;
+  gap: 24px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.export-mode .export-layout-row3 {
+  flex: 1;
+  min-height: 0;
+  gap: 24px !important;
+  flex-direction: row !important;
+}
+
+.export-mode table {
+  font-size: 0.9rem !important;
+}
+
+.export-mode td, .export-mode th {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.export-mode .custom-scrollbar {
+  overflow-y: hidden !important;
+}
+
+.export-mode .custom-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.export-mode .overflow-y-auto,
+.export-mode .overflow-x-auto {
+  overflow: hidden !important;
+  max-height: none !important;
+  max-width: none !important;
+  height: auto !important;
+}
+
+.export-mode .truncate,
+.export-mode .whitespace-nowrap {
+  white-space: normal !important;
+}
+
+

@@ -1,4 +1,5 @@
 import { VisitData } from '../types';
+import { getIdealTempRange } from './utils';
 
 export function calculateVisitResults(data: Partial<VisitData>) {
   const T = data.totalAnimals || 0;
@@ -134,21 +135,12 @@ export function calculateVisitResults(data: Partial<VisitData>) {
     const tempNum = Number(data.temp);
     
     // Ideal range depending on phase and age
-    let minTemp = 18;
-    let maxTemp = 28;
-    if (data.phase === 'Creche (leitões desmamados)') {
-      if (elapsedDays < 14) {
-        minTemp = 26; maxTemp = 32;
-      } else {
-        minTemp = 22; maxTemp = 28;
-      }
-    } else if (data.phase === 'Terminação') {
-      minTemp = 16; maxTemp = 24;
-    }
+    const phaseStr = data.phase || '';
+    const { min: minTemp, max: maxTemp, label } = getIdealTempRange(phaseStr, data.date, data.housingDate);
 
     if (tempNum < minTemp || tempNum > maxTemp) {
       scoreBreakdown.environmentDeduction += 3;
-      envDescParts.push(`Temperatura inadequada p/ fase (${tempNum}°C vs ${minTemp}-${maxTemp}°C, -3)`);
+      envDescParts.push(`Temperatura inadequada p/ fase (${tempNum}°C vs ${label}, -3)`);
     }
   }
   

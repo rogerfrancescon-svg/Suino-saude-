@@ -250,14 +250,22 @@ export default function App() {
       {/* Sidebar Mobile Toggle */}
       <button 
         onClick={() => setSidebarOpen(!isSidebarOpen)}
-        className="fixed top-4 right-4 z-50 p-2 bg-[var(--surface)] border border-[var(--border)] rounded-full md:hidden shadow-lg"
+        className="fixed top-4 right-4 z-[60] p-2 bg-[var(--surface)] border border-[var(--border)] rounded-full md:hidden shadow-lg"
       >
         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-60 bg-[var(--surface)] border-r border-[var(--border)] transition-transform duration-300 md:translate-x-0 md:static truncate shrink-0",
+        "fixed inset-y-0 left-0 z-50 w-60 bg-[var(--surface)] border-r border-[var(--border)] transition-transform duration-300 md:translate-x-0 md:static truncate shrink-0",
         isSidebarOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex flex-col h-full">
@@ -315,28 +323,7 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 min-w-0 bg-[var(--bg)] flex flex-col overflow-hidden">
-        {/* Persistent Header */}
-        {activeScreen !== 0 && (
-          <header className="h-16 border-b border-[var(--border)] px-8 flex items-center justify-between shrink-0 bg-[var(--bg)] z-30">
-            <div className="flex items-center gap-8">
-              <div className="min-w-0">
-                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-tighter">Cliente</p>
-                <p className="text-sm font-semibold truncate max-w-[150px]">{currentVisit.producer || '—'}</p>
-              </div>
-              <div className="h-8 w-px bg-[var(--border)] hidden sm:block"></div>
-              <div className="min-w-0 hidden sm:block">
-                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-tighter">Produtor</p>
-                <p className="text-sm font-semibold truncate max-w-[200px]">{currentVisit.farm || '—'}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="hidden md:inline-block px-2 py-0.5 bg-brand-success/10 text-[var(--accent-success)] text-[9px] font-bold rounded border border-brand-success/30 uppercase tracking-tighter">
-                Lote: {currentVisit.phase ? currentVisit.phase.split(' ')[0] : '—'}
-              </span>
-              <span className="text-[10px] text-[var(--text-dim)] font-medium">Data: {currentVisit.date?.split('-').reverse().join('/')}</span>
-            </div>
-          </header>
-        )}
+
 
         <div className={cn("flex-1 overflow-y-auto", activeScreen === 0 ? "" : "p-4 md:p-8")}>
           <div className={cn("mx-auto space-y-6", activeScreen === 0 ? "w-full" : "max-w-4xl")}>
@@ -348,18 +335,17 @@ export default function App() {
               animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, x: -20, filter: 'blur(4px)' }}
               transition={{ duration: 0.2 }}
+              className="touch-pan-y"
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.2}
-              onDragEnd={(_, info) => {
-                const swipeThreshold = 50;
-                if (info.offset.x > swipeThreshold) {
-                  handlePrevTab();
-                } else if (info.offset.x < -swipeThreshold) {
+              dragElastic={0.05}
+              onDragEnd={(e, { offset, velocity }) => {
+                if (offset.x < -60 || velocity.x < -300) {
                   handleNextTab();
+                } else if (offset.x > 60 || velocity.x > 300) {
+                  handlePrevTab();
                 }
               }}
-              className="touch-pan-y"
             >
               {activeScreen === 0 && (
                 <DashboardScreen 
@@ -414,7 +400,7 @@ export default function App() {
               {activeScreen === 6 && (
                 <HistoryScreen 
                   history={history}
-                  onRefresh={() => {}}
+                  setHistory={setHistory}
                   onDeleteSelected={deleteHistory}
                   onExportPDF={exportToPDF}
                   onExportExcel={exportToExcel}

@@ -1,0 +1,30 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} { allow read, write: if false; }
+    
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    function isValidVisit(data) {
+      return data.keys().hasAll(['id', 'userId', 'producer', 'farm', 'date', 'phase'])
+             && data.userId == request.auth.uid
+             && data.id is number
+             && data.userId is string && data.userId.size() <= 128
+             && data.producer is string && data.producer.size() <= 200
+             && data.farm is string && data.farm.size() <= 200
+             && data.date is string && data.date.size() <= 50
+             && data.phase is string && data.phase.size() <= 200
+             && data.keys().size() <= 30;
+    }
+
+    match /users/{userId}/history/{visitId} {
+      allow read, list: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() && userId == request.auth.uid && isValidId(userId) && isValidId(visitId) && isValidVisit(incoming());
+      allow update: if isSignedIn() && userId == request.auth.uid && existing().userId == request.auth.uid && isValidVisit(incoming()) && incoming().id == existing().id && incoming().userId == existing().userId;
+      allow delete: if isSignedIn() && userId == request.auth.uid && existing().userId == request.auth.uid;
+    }
+  }
+}

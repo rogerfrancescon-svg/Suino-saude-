@@ -111,6 +111,94 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
         </div>
       </div>
 
+      <div className="space-y-4 mb-6">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2 px-1">
+          📋 Informações do Lote
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Identificação */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Identificação</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Produtor / Granja</p>
+                <p className="font-medium">{data.producer || '-'} {data.farm ? `— ${data.farm}` : ''}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data da Visita</p>
+                <p className="font-medium">{data.date ? new Date(data.date).toLocaleDateString('pt-BR') : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Fase de Produção</p>
+                <p className="font-medium">{data.phase || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Lote / Galpão</p>
+                <p className="font-medium">{data.batch || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dados Produtivos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Dados Produtivos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Animais Alojados</p>
+                <p className="font-medium">{data.totalAnimals || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data de Alojamento</p>
+                <p className="font-medium">{data.housingDate ? new Date(data.housingDate).toLocaleDateString('pt-BR') : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
+                <p className="font-medium text-brand-danger">{data.mortality || '0'} ({results.mortalityRate?.toFixed(2) || '0.00'}%)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Nutrição e Medicamentos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Nutrição & Medicamentos</h4>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Ração / Água</p>
+                <p className="font-medium">{data.feed || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Medicamentos (Via ração/água)</p>
+                <p className="font-medium">{data.meds || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Ambiente e Sinais Clínicos Básicos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Ambiente & Sinais Clínicos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Temperatura</p>
+                <p className="font-medium">{data.temp ? `${data.temp}°C` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Umidade</p>
+                <p className="font-medium">{data.humidity ? `${data.humidity}%` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Tosse / Baias</p>
+                <p className="font-medium">{data.counts?.cough || 0}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Espirro / Baias</p>
+                <p className="font-medium">{data.counts?.sneeze || 0}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
            <div className={cn("p-5 rounded-2xl relative overflow-hidden flex flex-col justify-center border", 

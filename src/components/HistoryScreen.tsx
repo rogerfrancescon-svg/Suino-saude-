@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { VisitData } from '../types';
-import { FileText, Table as TableIcon, MessageSquare, Trash2, RotateCcw, CheckSquare, Square } from 'lucide-react';
+import { FileText, Table as TableIcon, MessageSquare, Trash2, RotateCcw, CheckSquare, Square, CloudUpload, LogIn, LogOut } from 'lucide-react';
 import { cn, formatDateBR } from '../lib/utils';
+import { auth } from '../lib/firebase';
+import { signInWithGoogle, logout, syncHistoryToCloud, getHistoryFromCloud } from '../lib/sync';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface Props {
   history: VisitData[];
-  onRefresh: () => void;
+  setHistory: React.Dispatch<React.SetStateAction<VisitData[]>>;
   onDeleteSelected: (ids: number[]) => void;
   onExportPDF: (records: VisitData[]) => void;
   onExportExcel: (records: VisitData[]) => void;
@@ -13,9 +16,16 @@ interface Props {
   onEdit: (visit: VisitData) => void;
 }
 
-export default function HistoryScreen({ history, onRefresh, onDeleteSelected, onExportPDF, onExportExcel, onExportWhatsApp, onEdit }: Props) {
-  const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
-  const [isConfirmingDelete, setIsConfirmingDelete] = React.useState(false);
+export default function HistoryScreen({ history, setHistory, onDeleteSelected, onExportPDF, onExportExcel, onExportWhatsApp, onEdit }: Props) {
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [user, setUser] = useState(auth.currentUser);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, u => setUser(u));
+    return () => unsub();
+  }, []);
 
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -27,6 +37,37 @@ export default function HistoryScreen({ history, onRefresh, onDeleteSelected, on
   const getTargetRecords = () => {
     if (selectedIds.length === 0) return history;
     return history.filter(h => selectedIds.includes(h.id));
+  };
+
+  const handleSync = async () => {
+    if (!user) return;
+    try {
+      setIsSyncing(true);
+      // Upload local history
+      await syncHistoryToCloud(history);
+      // Fetch combined history
+      const cloudHistory = await getHistoryFromCloud();
+      
+      // Merge unique based on ID
+      const merged = [...history, ...cloudHistory].reduce((acc, curr) => {
+        if (!acc.find(v => v.id === curr.id)) {
+          acc.push(curr);
+        } else {
+          // If collision, prefer cloud or newer? Prefer cloud.
+          const idx = acc.findIndex(v => v.id === curr.id);
+          acc[idx] = curr;
+        }
+        return acc;
+      }, [] as VisitData[]);
+      
+      setHistory(merged);
+      alert('Sincronização concluída com sucesso!');
+    } catch (e: any) {
+      console.error(e);
+      alert('Erro na sincronização: ' + e.message);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const sortedHistory = [...history].sort((a, b) => new Date(b.id).getTime() - new Date(a.id).getTime());
@@ -83,10 +124,38 @@ export default function HistoryScreen({ history, onRefresh, onDeleteSelected, on
         </div>
       </div>
 
+      <div className="card rounded-xl p-5 space-y-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
+          ☁️ Nuvem ({user ? user.email : 'Desconectado'})
+        </h3>
+        {user ? (
+          <div className="flex gap-3">
+            <button 
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
+            >
+              <CloudUpload size={16} /> {isSyncing ? 'Sincronizando...' : 'Sincronizar Histórico'}
+            </button>
+            <button 
+              onClick={() => logout()}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--border)] text-xs font-bold rounded-lg transition-colors"
+            >
+              <LogOut size={16} /> Sair
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => signInWithGoogle()}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--surface-hover)] border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text-main)] text-xs font-bold rounded-lg transition-colors"
+          >
+            <LogIn size={16} /> Entrar com Google para Sincronizar
+          </button>
+        )}
+      </div>
+
       <div className="flex justify-between items-center bg-[var(--surface)] p-2 rounded-lg">
-        <button onClick={onRefresh} className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-[var(--text-muted)] hover:text-brand-primary transition-colors">
-          <RotateCcw size={14} /> Atualizar
-        </button>
+        <div className="flex gap-2"></div>
         {isConfirmingDelete ? (
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-brand-danger">Tem certeza?</span>
