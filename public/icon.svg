@@ -1,42 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
+    <!-- Background Gradient -->
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0F172A" />
       <stop offset="100%" stop-color="#1E293B" />
     </linearGradient>
+    
+    <!-- Shield Outline -->
     <linearGradient id="shield-stroke" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F97316" />
-      <stop offset="100%" stop-color="#F59E0B" />
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#34D399" />
     </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#22C55E" />
-      <stop offset="100%" stop-color="#10B981" />
+
+    <!-- Pig Pink -->
+    <linearGradient id="pig-pink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCA5A5" />
+      <stop offset="100%" stop-color="#F87171" />
+    </linearGradient>
+    
+    <!-- Snout Pink -->
+    <linearGradient id="snout-pink" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F87171" />
+      <stop offset="100%" stop-color="#EF4444" />
+    </linearGradient>
+
+    <!-- Medical Green Accent -->
+    <linearGradient id="medical-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#059669" />
     </linearGradient>
   </defs>
 
-  <rect width="512" height="512" fill="url(#bg)" />
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
   
-  <!-- Shield Outline (Brasão) -->
-  <path d="M256,40 C256,40 100,70 60,110 C60,260 90,380 256,470 C422,380 452,260 452,110 C412,70 256,40 256,40 Z" fill="none" stroke="url(#shield-stroke)" stroke-width="24" stroke-linejoin="round" />
-  
-  <!-- Inner Shield Section -->
-  <path d="M256,70 C256,70 120,95 85,130 C85,250 110,355 256,430 C402,355 427,250 427,130 C392,95 256,70 256,70 Z" fill="#0F172A" stroke="url(#accent)" stroke-width="8" stroke-dasharray="10 15" stroke-linecap="round" />
+  <!-- Outer Shield -->
+  <path d="M256,60 C256,60 110,95 80,140 C80,280 110,380 256,460 C402,380 432,280 432,140 C402,95 256,60 256,60 Z" fill="#1E293B" stroke="url(#shield-stroke)" stroke-width="16" stroke-linejoin="round" />
 
-  <!-- Medical Cross Top -->
-  <path d="M256,90 L256,140 M231,115 L281,115" stroke="url(#accent)" stroke-width="14" stroke-linecap="round" />
-
-  <!-- Pig Silhouette Geometric -->
-  <path d="M190,195 L220,240 L292,240 L322,195 C330,180 350,190 350,210 L335,280 L350,330 C350,350 330,360 310,340 L256,290 L202,340 C182,360 162,350 162,330 L177,280 L162,210 C162,190 182,180 190,195 Z" fill="#334155" stroke="#475569" stroke-width="4" stroke-linejoin="round" />
+  <!-- Pig Ears -->
+  <path d="M150,160 L180,220 L230,220 Z" fill="url(#snout-pink)" />
+  <path d="M362,160 L332,220 L282,220 Z" fill="url(#snout-pink)" />
   
-  <!-- Snout Main -->
-  <path d="M206,290 C206,270 236,255 256,255 C276,255 306,270 306,290 C306,310 276,330 256,330 C236,330 206,310 206,290 Z" fill="url(#shield-stroke)" />
+  <!-- Pig Face (Circle/Oval) -->
+  <ellipse cx="256" cy="270" rx="110" ry="100" fill="url(#pig-pink)" />
+  
+  <!-- Snout -->
+  <ellipse cx="256" cy="295" rx="45" ry="35" fill="url(#snout-pink)" />
   
   <!-- Nostrils -->
-  <ellipse cx="236" cy="290" rx="10" ry="14" fill="#0F172A" />
-  <ellipse cx="276" cy="290" rx="10" ry="14" fill="#0F172A" />
+  <ellipse cx="236" cy="295" rx="10" ry="12" fill="#7F1D1D" />
+  <ellipse cx="276" cy="295" rx="10" ry="12" fill="#7F1D1D" />
   
   <!-- Eyes -->
-  <path d="M220,225 Q230,220 240,225" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" fill="none" />
-  <path d="M292,225 Q282,220 272,225" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" fill="none" />
+  <circle cx="210" cy="235" r="12" fill="#7F1D1D" />
+  <circle cx="302" cy="235" r="12" fill="#7F1D1D" />
+
+  <!-- Medical Cross Bottom/Top -->
+  <path d="M256,120 L256,160 M236,140 L276,140" stroke="url(#medical-green)" stroke-width="16" stroke-linecap="round" />
 
 </svg>
