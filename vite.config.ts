@@ -6,7 +6,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  // In GitHub Actions, VITE_BASE_PATH is passed directly from steps.pages.outputs.base_path.
+  let baseFromEnv = process.env.VITE_BASE_PATH !== undefined ? process.env.VITE_BASE_PATH : (mode === 'production' ? '/Suino-saude-/' : '/');
+  if (baseFromEnv && !baseFromEnv.startsWith('/')) baseFromEnv = '/' + baseFromEnv;
+  const repoBase = baseFromEnv ? `${baseFromEnv}/`.replace(/\/\/+/g, '/') : '/';
+  
   return {
+    base: repoBase,
     plugins: [
       react(), 
       tailwindcss(),
@@ -20,6 +26,9 @@ export default defineConfig(({mode}) => {
           theme_color: '#0F172A',
           background_color: '#0F172A',
           display: 'standalone',
+          start_url: repoBase,
+          scope: repoBase,
+          id: repoBase,
           icons: [
             {
               src: 'icon-192x192.png',
