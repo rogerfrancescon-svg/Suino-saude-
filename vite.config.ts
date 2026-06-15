@@ -7,6 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
+    base: './',
     plugins: [
       react(), 
       tailwindcss(),
@@ -14,13 +15,12 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg', 'favicon.ico', 'icon-192x192.png', 'icon-512x512.png'],
         manifest: {
-          name: 'SuinoSaúde',
-          short_name: 'SuinoSaúde',
+          name: 'Suíno Saúde',
+          short_name: 'Suíno Saúde',
           description: 'Aplicativo para saúde e manejo de suínos',
           theme_color: '#0F172A',
           background_color: '#0F172A',
           display: 'standalone',
-          start_url: '.',
           icons: [
             {
               src: 'icon-192x192.png',
