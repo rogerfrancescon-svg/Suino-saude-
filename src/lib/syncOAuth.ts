@@ -1,11 +1,20 @@
-import { initializeApp, getApp, getApps } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut } from 'firebase/auth';
+import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, User, signOut, Auth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { VisitData } from '../types';
 import { calculateVisitResults } from './scoring';
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+
+try {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+  auth = getAuth(app);
+} catch (e) {
+  console.warn("Failed to initialize Firebase Sync OAuth", e);
+}
+
+export { auth };
 
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/drive.file');
@@ -18,6 +27,10 @@ export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
+  if (!auth) {
+    if (onAuthFailure) onAuthFailure();
+    return () => {};
+  }
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
       if (cachedAccessToken) {
@@ -34,6 +47,7 @@ export const initAuth = (
 };
 
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+  if (!auth) throw new Error("Firebase Auth is not initialized. Please configure credentials.");
   try {
     isSigningIn = true;
     const result = await signInWithPopup(auth, provider);
@@ -57,6 +71,7 @@ export const getAccessToken = async (): Promise<string | null> => {
 };
 
 export const logout = async () => {
+  if (!auth) return;
   await signOut(auth);
   cachedAccessToken = null;
 };

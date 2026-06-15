@@ -71,12 +71,27 @@ export default function App() {
   };
 
   const [currentVisit, setCurrentVisit] = useState<Partial<VisitData>>(() => {
-    const saved = localStorage.getItem('suinosaude_draft');
-    return saved ? normalizeVisit(JSON.parse(saved)) : INITIAL_VISIT;
+    try {
+      const saved = localStorage.getItem('suinosaude_draft');
+      if (saved) return normalizeVisit(JSON.parse(saved));
+    } catch (e) {
+      console.warn('Failed to parse draft from localStorage', e);
+    }
+    return INITIAL_VISIT;
   });
   const [history, setHistory] = useState<VisitData[]>(() => {
-    const saved = localStorage.getItem('suinosaude_history');
-    let parsedHistory = saved ? JSON.parse(saved).map(normalizeVisit) : [];
+    let parsedHistory: any[] = [];
+    try {
+      const saved = localStorage.getItem('suinosaude_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsedHistory = parsed.map(normalizeVisit);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse history from localStorage', e);
+    }
     
     // Cleanup old mock seeds if they exist
     const hasOldSeeds = parsedHistory.some((h: any) => 
