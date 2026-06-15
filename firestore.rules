@@ -9,22 +9,19 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
 
     function isValidVisit(data) {
-      return data.keys().hasAll(['id', 'userId', 'producer', 'farm', 'date', 'phase'])
+      return data.keys().hasAll(['id', 'userId', 'date'])
              && data.userId == request.auth.uid
              && data.id is number
              && data.userId is string && data.userId.size() <= 128
-             && data.producer is string && data.producer.size() <= 200
-             && data.farm is string && data.farm.size() <= 200
-             && data.date is string && data.date.size() <= 50
-             && data.phase is string && data.phase.size() <= 200
-             && data.keys().size() <= 30;
+             && data.date is string && data.date.size() <= 100
+             && data.keys().size() <= 100;
     }
 
     match /users/{userId}/history/{visitId} {
       allow read, list: if isSignedIn() && userId == request.auth.uid;
       allow create: if isSignedIn() && userId == request.auth.uid && isValidId(userId) && isValidId(visitId) && isValidVisit(incoming());
-      allow update: if isSignedIn() && userId == request.auth.uid && existing().userId == request.auth.uid && isValidVisit(incoming()) && incoming().id == existing().id && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && userId == request.auth.uid && existing().userId == request.auth.uid;
+      allow update: if isSignedIn() && userId == request.auth.uid && isValidId(userId) && isValidId(visitId) && isValidVisit(incoming()) && (!('userId' in existing()) || existing().userId == request.auth.uid);
+      allow delete: if isSignedIn() && userId == request.auth.uid;
     }
   }
 }

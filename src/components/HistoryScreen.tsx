@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { VisitData } from '../types';
-import { FileText, Table as TableIcon, MessageSquare, Trash2, RotateCcw, CheckSquare, Square, CloudUpload, LogIn, LogOut } from 'lucide-react';
+import { FileText, Table as TableIcon, MessageSquare, Trash2, CheckSquare, Square, Download, Upload, AlertCircle, CloudUpload, CloudDownload, LogOut, LogIn, ExternalLink } from 'lucide-react';
 import { cn, formatDateBR } from '../lib/utils';
-import { auth } from '../lib/firebase';
-import { signInWithGoogle, logout, syncHistoryToCloud, getHistoryFromCloud } from '../lib/sync';
-import { onAuthStateChanged } from 'firebase/auth';
+import { exportBackupToExcel, importBackupFromExcel } from '../lib/exports';
+import { googleSignIn, initAuth, logout, syncHistoryToSheets, fetchHistoryFromSheets, getOnlineSpreadsheetUrl } from '../lib/syncOAuth';
+import { User } from 'firebase/auth';
 
 interface Props {
   history: VisitData[];
@@ -19,13 +19,77 @@ interface Props {
 export default function HistoryScreen({ history, setHistory, onDeleteSelected, onExportPDF, onExportExcel, onExportWhatsApp, onEdit }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [user, setUser] = useState(auth.currentUser);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [isOnlineSyncing, setIsOnlineSyncing] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+
+  const fetchUrl = async () => {
+    try {
+      const url = await getOnlineSpreadsheetUrl();
+      setSheetUrl(url);
+    } catch {
+      setSheetUrl(null);
+    }
+  };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => setUser(u));
+    const unsub = initAuth(
+      (u) => { setNeedsAuth(false); setUser(u); fetchUrl(); },
+      () => { setNeedsAuth(true); setUser(null); setSheetUrl(null); }
+    );
     return () => unsub();
   }, []);
+
+  const handleOnlineLogin = async () => {
+    try {
+      const result = await googleSignIn();
+      if (result) {
+        setUser(result.user);
+        setNeedsAuth(false);
+        fetchUrl();
+      }
+    } catch (e: any) {
+      setImportError('Erro ao fazer login: ' + (e.message || String(e)));
+    }
+  };
+
+  const handleOnlineSync = async () => {
+    try {
+      setIsOnlineSyncing(true);
+      setImportError(null);
+      // 1. fetch remote history
+      const remoteHistory = await fetchHistoryFromSheets();
+      
+      // 2. merge with local
+      const merged = [...history, ...remoteHistory].reduce((acc, curr) => {
+        if (!acc.find(v => v.id === curr.id)) {
+          acc.push(curr);
+        } else {
+          // preserve the latest one based on some heuristic, or just prefer remote
+          const idx = acc.findIndex(v => v.id === curr.id);
+          acc[idx] = curr;
+        }
+        return acc;
+      }, [] as VisitData[]);
+
+      setHistory(merged);
+
+      // 3. sync the merged result back up
+      await syncHistoryToSheets(merged);
+      
+      alert('Sincronização online concluída com sucesso!');
+      fetchUrl();
+    } catch (e: any) {
+      console.error(e);
+      setImportError('Erro de sincronização: ' + (e.message || String(e)));
+    } finally {
+      setIsOnlineSyncing(false);
+    }
+  };
 
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -39,34 +103,38 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
     return history.filter(h => selectedIds.includes(h.id));
   };
 
-  const handleSync = async () => {
-    if (!user) return;
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
     try {
-      setIsSyncing(true);
-      // Upload local history
-      await syncHistoryToCloud(history);
-      // Fetch combined history
-      const cloudHistory = await getHistoryFromCloud();
+      setIsImporting(true);
+      setImportError(null);
+      const importedHistory = await importBackupFromExcel(file);
       
+      if (importedHistory.length === 0) {
+        alert('Nenhum registro encontrado no arquivo de backup.');
+        return;
+      }
+
       // Merge unique based on ID
-      const merged = [...history, ...cloudHistory].reduce((acc, curr) => {
+      const merged = [...history, ...importedHistory].reduce((acc, curr) => {
         if (!acc.find(v => v.id === curr.id)) {
           acc.push(curr);
         } else {
-          // If collision, prefer cloud or newer? Prefer cloud.
           const idx = acc.findIndex(v => v.id === curr.id);
           acc[idx] = curr;
         }
         return acc;
       }, [] as VisitData[]);
-      
+
       setHistory(merged);
-      alert('Sincronização concluída com sucesso!');
-    } catch (e: any) {
-      console.error(e);
-      alert('Erro na sincronização: ' + e.message);
+      alert(`Sincronização concluída com sucesso! ${importedHistory.length} registros sincronizados/carregados.`);
+    } catch (err: any) {
+      console.error('Failed to import backup:', err);
+      setImportError('Falha ao importar planilha de backup: certifique-se de usar uma planilha gerada pelo aplicativo.');
     } finally {
-      setIsSyncing(false);
+      setIsImporting(false);
+      e.target.value = '';
     }
   };
 
@@ -126,32 +194,102 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
 
       <div className="card rounded-xl p-5 space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
-          ☁️ Nuvem ({user ? user.email : 'Desconectado'})
+          ☁️ Backup Online (Planilha Google)
         </h3>
-        {user ? (
-          <div className="flex gap-3">
-            <button 
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
-            >
-              <CloudUpload size={16} /> {isSyncing ? 'Sincronizando...' : 'Sincronizar Histórico'}
-            </button>
-            <button 
-              onClick={() => logout()}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--border)] text-xs font-bold rounded-lg transition-colors"
-            >
-              <LogOut size={16} /> Sair
-            </button>
+        
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+          Sincronize todo o seu histórico diretamente do aplicativo para o seu Google Drive. Um arquivo chamado <strong>SuinoSaude_Backup_Online</strong> será criado e gerenciado automaticamente pelo aplicativo.
+        </p>
+
+        {importError && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-500 font-medium flex items-center gap-2">
+            <AlertCircle size={14} className="shrink-0" />
+            <span>{importError}</span>
           </div>
-        ) : (
+        )}
+
+        {needsAuth || !user ? (
           <button 
-            onClick={() => signInWithGoogle()}
-            className="w-full flex items-center justify-center gap-2 py-2.5 bg-[var(--surface-hover)] border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text-main)] text-xs font-bold rounded-lg transition-colors"
+            onClick={handleOnlineLogin}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--surface-hover)] border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text-main)] text-xs font-bold rounded-lg transition-colors"
           >
             <LogIn size={16} /> Entrar com Google para Sincronizar
           </button>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3 bg-brand-primary/10 rounded-lg border border-brand-primary/20">
+              <span className="text-xs font-medium text-[var(--text-main)]">Conectado como: <strong>{user.email}</strong></span>
+              <button 
+                onClick={() => logout()}
+                className="text-[10px] font-bold text-brand-primary hover:underline"
+              >
+                Desconectar
+              </button>
+            </div>
+            
+            <button 
+              onClick={handleOnlineSync}
+              disabled={isOnlineSyncing}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 py-3 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors cursor-pointer",
+                isOnlineSyncing && "opacity-50 pointer-events-none"
+              )}
+            >
+              <CloudUpload size={16} /> {isOnlineSyncing ? 'Sincronizando...' : 'Sincronizar com Planilha Online'}
+            </button>
+            {sheetUrl && (
+              <a 
+                href={sheetUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full flex items-center justify-center gap-2 py-3 border border-brand-primary text-brand-primary hover:bg-brand-primary/10 text-xs font-bold rounded-lg transition-colors"
+              >
+                <ExternalLink size={16} /> Acessar Planilha
+              </a>
+            )}
+          </div>
         )}
+      </div>
+
+      <div className="card rounded-xl p-5 space-y-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
+          📊 Sincronização por Planilha (Backup Offline)
+        </h3>
+        
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+          Exporte um backup completo com todos os parâmetros ou envie um arquivo (.xlsx) para mesclar e sincronizar os registros.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-muted)]">Salvar Estado Atual</span>
+            <button 
+              onClick={() => exportBackupToExcel(history)}
+              className="w-full flex items-center justify-center gap-2 py-3 border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--surface-hover)] text-xs font-bold rounded-lg transition-colors cursor-pointer"
+            >
+              <Download size={16} /> Baixar Arquivo .xlsx
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-muted)]">Restaurar e Mesclar Backup</span>
+            <label 
+              className={cn(
+                "w-full flex items-center justify-center gap-2 py-3 px-4 border border-dashed border-[var(--border)] hover:bg-[var(--surface-hover)] hover:border-brand-primary text-[var(--text-main)] text-xs font-bold rounded-lg transition-all cursor-pointer text-center",
+                isImporting && "opacity-50 pointer-events-none"
+              )}
+            >
+              <Upload size={16} /> 
+              <span>{isImporting ? 'Enviando...' : 'Carregar Arquivo .xlsx'}</span>
+              <input 
+                type="file" 
+                accept=".xlsx" 
+                onChange={handleImportBackup} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-between items-center bg-[var(--surface)] p-2 rounded-lg">

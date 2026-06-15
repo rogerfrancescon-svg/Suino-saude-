@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { VisitData } from '../types';
 import { formatDateBR, getIdealTempRange } from './utils';
+import { calculateVisitResults } from './scoring';
 
 // Extending jsPDF with autotable types
 declare module 'jspdf' {
@@ -444,4 +445,123 @@ export function exportToWhatsApp(records: VisitData[]) {
 
   const text = encodeURIComponent(summary);
   window.open(`https://wa.me/?text=${text}`, '_blank');
+}
+
+export function exportBackupToExcel(history: VisitData[]) {
+  const wb = XLSX.utils.book_new();
+  
+  const backupRows = history.map(v => ({
+    'ID': v.id,
+    'Cliente_Associado': v.producer,
+    'Unidade_Produtor': v.farm,
+    'Lote': v.batch || '',
+    'Data_Visita': v.date,
+    'Fase_Producao': v.phase,
+    'Racao_Atual': v.feed || '',
+    'Protocolo_Medicamentoso': v.meds || '',
+    'Data_Alojamento': v.housingDate || '',
+    'Total_Animais': v.totalAnimals || 0,
+    'Mortalidade_Lote': v.mortality || 0,
+    'Temperatura_C': v.temp || '',
+    'Umidade_Relativa': v.humidity || '',
+    'CO2_ppm': v.co2 || '',
+    'Duracao_Sintomas': v.duration || '',
+    'Contagem_Tosse': v.counts?.cough ?? 0,
+    'Contagem_Espirro': v.counts?.sneeze ?? 0,
+    'Contagem_Fezes_Pastosas': v.counts?.e2 ?? 0,
+    'Contagem_Fezes_Liquidas': v.counts?.e3 ?? 0,
+    'Observacoes': v.notes || '',
+    'Imagens_Urls': v.images ? JSON.stringify(v.images) : '[]'
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(backupRows);
+  XLSX.utils.book_append_sheet(wb, ws, 'Backup_SuinoSaude_Historico');
+
+  const filename = `SuinoSaude_Backup_Planilha_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+}
+
+export function importBackupFromExcel(file: File): Promise<VisitData[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error('Não foi possível ler o arquivo.');
+        }
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(sheet);
+
+        const visits: VisitData[] = rows.map(row => {
+          const id = Number(row['ID']) || Date.now();
+          const producer = String(row['Cliente_Associado'] ?? '');
+          const farm = String(row['Unidade_Produtor'] ?? '');
+          const batch = row['Lote'] !== undefined ? String(row['Lote']) : '';
+          const date = String(row['Data_Visita'] ?? new Date().toISOString().slice(0, 10));
+          const phase = String(row['Fase_Producao'] ?? '') as any;
+          const feed = String(row['Racao_Atual'] ?? '');
+          const meds = String(row['Protocolo_Medicamentoso'] ?? '');
+          const housingDate = String(row['Data_Alojamento'] ?? '');
+          const totalAnimals = Number(row['Total_Animais']) || 0;
+          const mortality = Number(row['Mortalidade_Lote']) || 0;
+          const temp = String(row['Temperatura_C'] ?? '');
+          const humidity = String(row['Umidade_Relativa'] ?? '');
+          const co2 = String(row['CO2_ppm'] ?? '');
+          const duration = String(row['Duracao_Sintomas'] ?? 'Insignificante (< 24h)') as any;
+          
+          const counts = {
+            cough: Number(row['Contagem_Tosse']) || 0,
+            sneeze: Number(row['Contagem_Espirro']) || 0,
+            e2: Number(row['Contagem_Fezes_Pastosas']) || 0,
+            e3: Number(row['Contagem_Fezes_Liquidas']) || 0
+          };
+
+          const notes = row['Observacoes'] ? String(row['Observacoes']) : '';
+          let images: string[] = [];
+          try {
+            if (row['Imagens_Urls']) {
+              images = JSON.parse(row['Imagens_Urls']);
+            }
+          } catch {
+            images = [];
+          }
+
+          const results = calculateVisitResults({
+            id, producer, farm, batch, date, phase, feed, meds, housingDate, totalAnimals, mortality, temp, humidity, co2, duration, counts
+          });
+
+          return {
+            id,
+            producer,
+            farm,
+            batch,
+            date,
+            phase,
+            feed,
+            meds,
+            housingDate,
+            mortality,
+            totalAnimals,
+            temp,
+            humidity,
+            co2,
+            duration,
+            counts,
+            results,
+            notes,
+            images
+          };
+        });
+
+        resolve(visits);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsBinaryString(file);
+  });
 }
