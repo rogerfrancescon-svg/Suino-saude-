@@ -904,7 +904,7 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                     <p className="text-[10px] text-[var(--text-dim)] uppercase font-medium mb-1">{latest.farm || 'Produtor N/A'}{latest.batch ? ` • Lote: ${latest.batch}` : ''}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="flex items-center gap-1 text-[9px] text-[var(--text-muted)] font-bold">
-                         <Layers size={10} /> {latest.phase?.split(' ')[0]}
+                         <Layers size={10} /> {(latest.phase || '').split(' ')[0]}
                       </span>
                       <span className="text-[var(--border)] text-[8px]">|</span>
                       <span className="flex items-center gap-1 text-[9px] text-[var(--text-muted)] font-bold">
