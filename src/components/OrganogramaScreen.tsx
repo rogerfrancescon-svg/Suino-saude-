@@ -87,7 +87,7 @@ export default function OrganogramaScreen({ history }: Props) {
               selectedPhase === phase ? "bg-brand-primary text-white border-brand-primary" : "bg-transparent text-[var(--text-main)] border-[var(--border)] hover:bg-[var(--surface-hover)]"
             )}
           >
-            {phase.split(' ')[0]}
+            {(phase || '').split(' ')[0]}
           </button>
         ))}
       </div>

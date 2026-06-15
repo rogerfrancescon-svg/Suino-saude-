@@ -15,7 +15,10 @@ const calculateHousingDays = (housingDateStr?: string, visitDateStr?: string) =>
   if (!housingDateStr || !visitDateStr) return '?';
   try {
     const parseDate = (dStr: string) => {
-      const [y, m, d] = dStr.split('T')[0].split('-');
+      if (!dStr) throw new Error('Invalid');
+      const parts = dStr.split('T')[0].split('-');
+      if (parts.length < 3) throw new Error('Invalid');
+      const [y, m, d] = parts;
       return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
     };
     const hd = parseDate(housingDateStr);
