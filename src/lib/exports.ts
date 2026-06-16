@@ -51,10 +51,23 @@ export function exportToPDF(records: VisitData[]) {
     doc.line(margin, y, W - margin, y);
     y += 5;
 
+    let ageStr = '';
+    if (d.housingDate && d.date) {
+      const [y1, m1, d1] = d.housingDate.split('-').map(Number);
+      const [y2, m2, d2] = d.date.split('-').map(Number);
+      if (y1 && y2) {
+        const time1 = Date.UTC(y1, m1 - 1, d1);
+        const time2 = Date.UTC(y2, m2 - 1, d2);
+        const elapsedDays = Math.max(0, Math.round((time2 - time1) / (1000 * 60 * 60 * 24)));
+        ageStr = `${elapsedDays} dias`;
+      }
+    }
+
     const idBody = [
       ['Cliente Associado', d.producer],
       ['Unidade / Produtor', d.farm],
       ['Lote', d.batch || 'Não informado'],
+      ['Idade do Lote', ageStr || 'Não informada'],
       ['Fase de Produção', d.phase],
       ['Efetivo do Lote', `${d.totalAnimals} animais`],
     ];

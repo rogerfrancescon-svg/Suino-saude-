@@ -153,6 +153,14 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
                 <p className="font-medium">{data.housingDate ? new Date(data.housingDate).toLocaleDateString('pt-BR') : '-'}</p>
               </div>
               <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Idade do Lote</p>
+                <p className="font-medium">
+                  {data.housingDate && data.date 
+                    ? `${Math.max(0, Math.floor((new Date(data.date).getTime() - new Date(data.housingDate).getTime()) / (1000 * 60 * 60 * 24)))} dias` 
+                    : '-'}
+                </p>
+              </div>
+              <div>
                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
                 <p className="font-medium text-brand-danger">{data.mortality || '0'} ({results.mortalityRate?.toFixed(2) || '0.00'}%)</p>
               </div>

@@ -287,7 +287,7 @@ export default function App() {
           <div className="p-5 mb-4">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-2xl">🛡️</span>
-              <h1 className="text-lg font-bold text-slate-100 leading-none">SuinoSaúde</h1>
+              <h1 className="text-lg font-bold text-slate-100 leading-none">Suino Saúde</h1>
             </div>
             <p className="text-[10px] text-brand-success-light uppercase tracking-wider font-bold">Inteligência Sanitária</p>
           </div>
@@ -438,7 +438,7 @@ export default function App() {
           </AnimatePresence>
 
           <footer className="text-center py-10 opacity-30">
-            <div className="text-[10px] font-bold uppercase tracking-[0.2em]">S u i n o S a ú d e • v 1 . 0</div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em]">S u i n o   S a ú d e • v 1 . 0</div>
           </footer>
         </div>
       </div>

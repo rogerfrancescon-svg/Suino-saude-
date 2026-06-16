@@ -20,8 +20,8 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg', 'favicon.ico', 'icon-192x192.png', 'icon-512x512.png'],
         manifest: {
-          name: 'Suíno Saúde',
-          short_name: 'Suíno Saúde',
+          name: 'Suino Saúde',
+          short_name: 'Suino Saúde',
           description: 'Aplicativo para saúde e manejo de suínos',
           theme_color: '#0F172A',
           background_color: '#0F172A',

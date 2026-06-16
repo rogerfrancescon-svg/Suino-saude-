@@ -53,7 +53,7 @@ export default function PwaPrompt() {
         <Smartphone size={24} />
       </div>
       <div className="flex-1">
-        <p className="text-sm font-bold text-white mb-1">Instalar SuinoSaúde</p>
+        <p className="text-sm font-bold text-white mb-1">Instalar Suino Saúde</p>
         <p className="text-xs text-slate-400 mb-3 leading-relaxed">Adicione o aplicativo à sua tela inicial para acesso offline, melhor performance e experiência em tela cheia.</p>
         <div className="flex items-center gap-2">
           <button 
