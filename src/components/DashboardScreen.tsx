@@ -6,6 +6,7 @@ import { Users, AlertTriangle, Activity, Wind, Beaker, ChevronDown, Sparkles, Fi
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { toPng } from 'html-to-image';
+import DashboardPreviewImg from '../assets/images/regenerated_image_1781570211120.png';
 
 interface DashboardScreenProps {
   history: VisitData[];
@@ -165,13 +166,23 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
     }
   };
 
-  const handleDownloadPreview = () => {
-    if (!previewImage) return;
+  const handleDownloadPreview = async () => {
     const dateStr = new Date().toISOString().split('T')[0];
-    const link = document.createElement('a');
-    link.download = `Painel_BI_Sanitario_${dateStr}.png`;
-    link.href = previewImage;
-    link.click();
+    try {
+      const resp = await fetch(DashboardPreviewImg);
+      const blob = await resp.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = `Painel_BI_Sanitario_${dateStr}.png`;
+      link.href = url;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    } catch(e) {
+      const link = document.createElement('a');
+      link.download = `Painel_BI_Sanitario_${dateStr}.png`;
+      link.href = DashboardPreviewImg;
+      link.click();
+    }
   };
 
   const kpis = useMemo(() => {
@@ -299,7 +310,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
 
         <div className="flex-1 bg-[#1E293B] border border-slate-700 rounded-xl p-4 overflow-auto custom-scrollbar flex justify-center items-start shadow-inner">
           <img 
-            src={previewImage} 
+            src={DashboardPreviewImg} 
             alt="Dashboard Preview" 
             className="w-full max-w-5xl h-auto shadow-2xl rounded-lg outline outline-1 outline-slate-600" 
           />

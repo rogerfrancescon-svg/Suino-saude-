@@ -73,7 +73,7 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
         images: data.images || []
       };
       
-      exportToPDF([exportableRecord]);
+      await exportToPDF([exportableRecord]);
     } catch (e) {
       console.error('Export error:', e);
       if (typeof window !== 'undefined' && window.alert) {

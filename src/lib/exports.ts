@@ -4,10 +4,13 @@ import * as XLSX from 'xlsx';
 import { VisitData } from '../types';
 import { formatDateBR, getIdealTempRange } from './utils';
 import { calculateVisitResults } from './scoring';
+import AppLogo from '../assets/images/regenerated_image_1781570211120.png';
 
 // Extending jsPDF with autotable types
 declare module 'jspdf' {
   interface jsPDF {
+    GState: any;
+    setGState: (state: any) => void;
     autoTable: any;
     lastAutoTable: {
       finalY: number;
@@ -15,32 +18,57 @@ declare module 'jspdf' {
   }
 }
 
-export function exportToPDF(records: VisitData[]) {
+export async function exportToPDF(records: VisitData[]) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const margin = 14;
 
+  const img = new window.Image();
+  img.src = AppLogo;
+  await new Promise((resolve) => {
+    img.onload = resolve;
+    img.onerror = resolve; // Continue even if image fails to load
+  });
+
   records.forEach((d, idx) => {
     if (idx > 0) doc.addPage();
     let y = 14;
 
-    // Header Branding
-    doc.setFillColor(15, 63, 138);
-    doc.rect(0, 0, W, 26, 'F');
+    // Header Branding with Image Base
+    const headerHeight = 36;
+    
+    try {
+      doc.addImage(img, 'PNG', 0, 0, W, headerHeight);
+      
+      // Setup overlay for readability
+      doc.setFillColor(15, 23, 42); // match dark theme
+      doc.setGState(new doc.GState({ opacity: 0.85 }));
+      doc.rect(0, 0, W, headerHeight, 'F');
+      doc.setGState(new doc.GState({ opacity: 1.0 }));
+    } catch {
+      // Fallback if image base doesn't work
+      doc.setFillColor(15, 23, 42);
+      doc.rect(0, 0, W, headerHeight, 'F');
+    }
+
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA — SUINOSAÚDE PRO', margin, 11);
-    doc.setFontSize(8);
+    doc.text('SUINO SAÚDE', margin, 18);
+    
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('Data da Visita: ' + formatDateBR(d.date), W - margin, 17, { align: 'right' });
+    doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA', margin, 24);
+
+    doc.setFontSize(8);
+    doc.text('Data da Visita: ' + formatDateBR(d.date), W - margin, 18, { align: 'right' });
     
     if (records.length > 1) {
-      doc.text(`Relatório Individual ${idx + 1} de ${records.length}`, W - margin, 11, { align: 'right' });
+      doc.text(`Relatório ${idx + 1} de ${records.length}`, W - margin, 24, { align: 'right' });
     }
     
-    y = 34;
+    y = headerHeight + 8;
 
     // I. Identification Section
     doc.setTextColor(15, 63, 138);
