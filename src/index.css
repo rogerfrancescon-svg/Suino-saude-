@@ -1,5 +1,54 @@
 @import "tailwindcss";
 
+/* --- DASHBOARD PREMIUM VISUAL UPGRADES --- */
+#executive-dashboard {
+  background: radial-gradient(circle at 15% 0%, #1e293b 0%, #0f172a 35%, #020617 100%) !important;
+  position: relative;
+}
+
+#executive-dashboard::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(circle at 85% 90%, rgba(99, 102, 241, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.03) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#executive-dashboard > header,
+#executive-dashboard > div {
+  position: relative;
+  z-index: 10;
+}
+
+/* Glassmorphism for Panels */
+#executive-dashboard .bg-\[\#1E293B\] {
+  background-color: rgba(30, 41, 59, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Soften Borders */
+#executive-dashboard .border-slate-700 {
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+#executive-dashboard .bg-\[\#0F172A\] {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* Enhancing Icons with subtle drop shadows */
+#executive-dashboard .text-green-500 { text-shadow: 0 0 12px rgba(34, 197, 94, 0.3); }
+#executive-dashboard .text-blue-500 { text-shadow: 0 0 12px rgba(59, 130, 246, 0.3); }
+#executive-dashboard .text-indigo-400 { text-shadow: 0 0 12px rgba(129, 140, 248, 0.3); }
+#executive-dashboard .text-red-500 { text-shadow: 0 0 12px rgba(239, 68, 68, 0.3); }
+#executive-dashboard .text-amber-500 { text-shadow: 0 0 12px rgba(245, 158, 11, 0.3); }
+#executive-dashboard .text-orange-500 { text-shadow: 0 0 12px rgba(249, 115, 22, 0.3); }
+
+
 @theme {
   --font-sans: "Sora", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
@@ -64,13 +113,14 @@ body {
 
 /* Export Mode Overrides for Full-Page Visual Render */
 .export-mode {
-  width: 1920px !important;
-  height: 1080px !important;
+  width: 1600px !important;
+  min-height: 1080px !important;
+  height: auto !important;
   max-width: none !important;
   max-height: none !important;
-  padding: 40px 60px !important;
+  padding: 40px !important;
   background-color: #0F172A !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
@@ -89,20 +139,46 @@ body {
 .export-mode .export-layout-row1 {
   flex-shrink: 0;
   gap: 16px !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 
 .export-mode .export-layout-row2 {
   flex-shrink: 0;
-  gap: 24px !important;
+  gap: 16px !important;
+  display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
 .export-mode .export-layout-row3 {
-  flex: 1;
+  flex-shrink: 0;
   min-height: 0;
-  gap: 24px !important;
+  gap: 16px !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+.export-mode .export-layout-row4 {
+  flex: none;
+  min-height: auto;
+  gap: 16px !important;
+  display: flex !important;
   flex-direction: row !important;
 }
+
+.export-mode .export-layout-row4 > div {
+  overflow: visible !important;
+}
+
+.export-mode .export-layout-row4 > div.flex-1 {
+  flex: 2 !important; /* Table gets more space */
+}
+
+.export-mode .export-layout-row4 > div.w-full.xl\:w-80 {
+  flex: 1 !important; /* Sidebar gets less space */
+  width: auto !important;
+}
+
 
 .export-mode table {
   font-size: 0.9rem !important;

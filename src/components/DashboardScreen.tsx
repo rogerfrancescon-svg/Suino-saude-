@@ -6,7 +6,6 @@ import { Users, AlertTriangle, Activity, Wind, Beaker, ChevronDown, Sparkles, Fi
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { toPng } from 'html-to-image';
-import DashboardPreviewImg from '../assets/images/regenerated_image_1781570211120.png';
 
 interface DashboardScreenProps {
   history: VisitData[];
@@ -123,18 +122,20 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
   const handleExport = async () => {
     try {
       setIsExporting(true);
+      const originalExpandedTable = expandedTable;
+      const originalExpandedRanking = expandedRanking;
+      setExpandedTable(true);
+      setExpandedRanking(true);
+      
+      // Give React time to render expanded state & hide controls
+      await new Promise(r => setTimeout(r, 400));
+
       const dashboardElement = document.getElementById('executive-dashboard');
       if (dashboardElement) {
         dashboardElement.classList.add('export-mode');
         
-        await new Promise(r => setTimeout(r, 400)); // allow browser to repaint layout fully
-
-        const elementsToHide = dashboardElement.querySelectorAll('button');
-        elementsToHide.forEach(el => {
-          if (el.textContent === 'Exportar' || el.textContent === 'Limpar' || el.textContent === 'X') {
-            (el as HTMLElement).style.opacity = '0';
-          }
-        });
+        // Allow CSS animations and repaints to finish
+        await new Promise(r => setTimeout(r, 600));
 
         const imgData = await toPng(dashboardElement, {
           pixelRatio: 2,
@@ -147,11 +148,9 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
           }
         });
 
-        elementsToHide.forEach(el => {
-          (el as HTMLElement).style.opacity = '1';
-        });
-
         dashboardElement.classList.remove('export-mode');
+        setExpandedTable(originalExpandedTable);
+        setExpandedRanking(originalExpandedRanking);
 
         setPreviewImage(imgData);
         setViewMode('preview');
@@ -166,23 +165,13 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
     }
   };
 
-  const handleDownloadPreview = async () => {
+  const handleDownloadPreview = () => {
+    if (!previewImage) return;
     const dateStr = new Date().toISOString().split('T')[0];
-    try {
-      const resp = await fetch(DashboardPreviewImg);
-      const blob = await resp.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.download = `Painel_BI_Sanitario_${dateStr}.png`;
-      link.href = url;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch(e) {
-      const link = document.createElement('a');
-      link.download = `Painel_BI_Sanitario_${dateStr}.png`;
-      link.href = DashboardPreviewImg;
-      link.click();
-    }
+    const link = document.createElement('a');
+    link.download = `Painel_BI_Sanitario_${dateStr}.png`;
+    link.href = previewImage;
+    link.click();
   };
 
   const kpis = useMemo(() => {
@@ -310,7 +299,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
 
         <div className="flex-1 bg-[#1E293B] border border-slate-700 rounded-xl p-4 overflow-auto custom-scrollbar flex justify-center items-start shadow-inner">
           <img 
-            src={DashboardPreviewImg} 
+            src={previewImage} 
             alt="Dashboard Preview" 
             className="w-full max-w-5xl h-auto shadow-2xl rounded-lg outline outline-1 outline-slate-600" 
           />
@@ -320,7 +309,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
   }
 
   return (
-    <div id="executive-dashboard" className="min-h-screen bg-[#0F172A] text-slate-50 font-sans p-4 md:p-6 pb-20">
+    <div id="executive-dashboard" className="min-h-screen text-slate-50 font-sans p-4 md:p-6 pb-20 selection:bg-indigo-500/30">
       
       {/* Global Header */}
       <header className="export-layout-header flex flex-col xl:flex-row xl:items-center justify-between gap-5 mb-8 bg-[#1E293B] p-4 lg:p-5 rounded-xl border border-slate-700 shadow-xl">
@@ -334,154 +323,214 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-start xl:justify-end gap-3 flex-1 min-w-0">
-          
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cliente:</span>
-              <select 
-                value={producerFilter}
-                onChange={(e) => setProducerFilter(e.target.value)}
-                className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
-              >
-                <option value="Todos">Todos</option>
-                {availableProducers.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
+        {!isExporting && (
+          <div className="flex flex-col md:flex-row flex-wrap items-stretch md:items-center justify-start xl:justify-end gap-3 flex-1 min-w-0">
+            
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cliente:</span>
+                <select 
+                  value={producerFilter}
+                  onChange={(e) => setProducerFilter(e.target.value)}
+                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
+                >
+                  <option value="Todos">Todos</option>
+                  {availableProducers.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prod:</span>
+                <select 
+                  value={farmFilter}
+                  onChange={(e) => setFarmFilter(e.target.value)}
+                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
+                >
+                  <option value="Todos">Todos</option>
+                  {availableFarms.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lote:</span>
+                <select 
+                  value={batchFilter}
+                  onChange={(e) => setBatchFilter(e.target.value)}
+                  className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
+                >
+                  <option value="Todos">Todos</option>
+                  {availableBatches.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
+              </div>
+
+              {(producerFilter !== 'Todos' || farmFilter !== 'Todos' || batchFilter !== 'Todos') && (
+                <button 
+                  onClick={() => {
+                    setProducerFilter('Todos');
+                    setFarmFilter('Todos');
+                    setBatchFilter('Todos');
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-colors border border-slate-700 hover:border-slate-500 shrink-0"
+                >
+                  <X size={12} />
+                  Limpar
+                </button>
+              )}
             </div>
 
-            <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Prod:</span>
-              <select 
-                value={farmFilter}
-                onChange={(e) => setFarmFilter(e.target.value)}
-                className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
-              >
-                <option value="Todos">Todos</option>
-                {availableFarms.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
+            <div className="flex bg-[#0F172A] border border-slate-700 rounded-lg p-1 overflow-x-auto hide-scrollbar whitespace-nowrap shrink-0">
+              {['Últimos 7 dias', 'Últimos 15 dias', 'Últimos 30 dias', 'Últimos 90 dias', 'Todo o período'].map(p => (
+                <button 
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    period === p ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                  )}
+                >
+                  {p === 'Todo o período' ? 'Todos' : p.replace('Últimos ', '').replace(' dias', 'd')}
+                </button>
+              ))}
             </div>
 
-            <div className="flex items-center gap-1.5 bg-[#0F172A] border border-slate-700 px-2.5 py-1.5 rounded-lg shrink-0">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Lote:</span>
-              <select 
-                value={batchFilter}
-                onChange={(e) => setBatchFilter(e.target.value)}
-                className="bg-transparent text-xs text-slate-200 outline-none cursor-pointer appearance-none pr-5 truncate max-w-[100px]"
-              >
-                <option value="Todos">Todos</option>
-                {availableBatches.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-              <ChevronDown size={12} className="text-slate-400 -ml-4 pointer-events-none" />
-            </div>
-
-            {(producerFilter !== 'Todos' || farmFilter !== 'Todos' || batchFilter !== 'Todos') && (
-              <button 
-                onClick={() => {
-                  setProducerFilter('Todos');
-                  setFarmFilter('Todos');
-                  setBatchFilter('Todos');
-                }}
-                className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition-colors border border-slate-700 hover:border-slate-500 shrink-0"
-              >
-                <X size={12} />
-                Limpar
-              </button>
-            )}
+            <button 
+              onClick={handleExport}
+              disabled={isExporting}
+              className="flex items-center justify-center gap-2 px-4 py-1.5 h-8 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-brand-primary/20 disabled:opacity-50 shrink-0"
+            >
+              {isExporting ? (
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Download size={14} />
+                  Exportar
+                </>
+              )}
+            </button>
           </div>
-
-          <div className="flex bg-[#0F172A] border border-slate-700 rounded-lg p-1 overflow-x-auto hide-scrollbar whitespace-nowrap shrink-0">
-            {['Últimos 7 dias', 'Últimos 15 dias', 'Últimos 30 dias', 'Últimos 90 dias', 'Todo o período'].map(p => (
-              <button 
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                  period === p ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                )}
-              >
-                {p === 'Todo o período' ? 'Todos' : p.replace('Últimos ', '').replace(' dias', 'd')}
-              </button>
-            ))}
-          </div>
-
-          <button 
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center justify-center gap-2 px-4 py-1.5 h-8 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-semibold rounded-lg transition-colors shadow-lg shadow-brand-primary/20 disabled:opacity-50 shrink-0"
-          >
-            {isExporting ? (
-              <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            ) : (
-              <>
-                <Download size={14} />
-                Exportar
-              </>
-            )}
-          </button>
-        </div>
+        )}
       </header>
 
-      {/* Row 1: KPIs */}
-      <div className="export-layout-row1 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-
-        <KPICard title="Clientes" val={kpis.total} sub="100% ativos" icon={<Users size={16} />} color="text-green-500" bg="bg-green-500/10" border="border-green-500/20" />
-        
-        <div className="bg-[#1E293B] border border-slate-700 p-4 rounded-xl shadow-lg relative overflow-hidden group hover:border-slate-600 transition-colors flex flex-col justify-between">
-          <div className="flex justify-between items-start">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Índice Médio</h3>
-            <span className="text-[10px] font-bold text-green-500 px-2 py-0.5 bg-green-500/10 rounded">Excelente</span>
+      {/* Row 1: KPIs Top */}
+      <div className="export-layout-row1 grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-green-500/10 text-green-500 flex items-center justify-center">
+              <Users size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Clientes</h3>
           </div>
-          <div className="flex items-center gap-4 mt-2">
-            <div className="w-12 h-12 relative flex-shrink-0">
+          <div>
+            <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.total}</p>
+            <p className="text-xs font-medium text-slate-400 mt-3">100% ativos</p>
+          </div>
+        </div>
+        
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Índice Médio</h3>
+            <span className="text-[10px] font-bold text-green-500 px-2 py-1 bg-green-500/10 rounded">Excelente</span>
+          </div>
+          <div className="flex justify-start items-center gap-4">
+            <div className="w-14 h-14 relative flex-shrink-0">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                <path
-                  className="text-slate-700"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="text-green-500 transition-all duration-1000"
-                  strokeDasharray={`${kpis.avgScore}, 100`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
+                <path className="text-slate-700" fill="none" stroke="currentColor" strokeWidth="4" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path className={cn("text-green-500 transition-all", isExporting ? "duration-0" : "duration-1000")} strokeDasharray={`${kpis.avgScore}, 100`} fill="none" stroke="currentColor" strokeWidth="4" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center font-bold font-mono text-[11px] text-white">
+              <div className="absolute inset-0 flex items-center justify-center font-bold font-mono text-sm text-white">
                 {kpis.avgScore}
               </div>
             </div>
             <div>
-              <p className="text-[10px] font-medium text-slate-500">Últimos 30 dias</p>
-              <p className="text-[11px] font-mono text-green-500 mt-0.5">↑ 4 pontos</p>
+              <p className="text-xs font-medium text-slate-300">Índice de Saúde</p>
+              <p className="text-xs font-bold text-green-500 mt-1 uppercase tracking-wider">↑ 4 Pontos</p>
             </div>
           </div>
         </div>
 
-        <KPICard title="Em Atenção" val={kpis.attentionCount} sub={`${kpis.attentionPct}% da rede`} icon={<AlertTriangle size={16} />} color="text-amber-500" bg="bg-amber-500/10" border="border-amber-500/20" />
-        <KPICard title="Críticos" val={kpis.criticalCount} sub={`${kpis.criticalPct}% da rede`} icon={<AlertTriangle size={16} />} color="text-red-500" bg="bg-red-500/10" border="border-red-500/20" />
-        
-        <KPICard title="Mortalidade" val={`${kpis.avgMortality}%`} sub="Meta: < 1,05% ↓0.18%" icon={<Thermometer size={16} />} color="text-blue-500" bg="bg-blue-500/10" border="border-blue-500/20" />
-        <KPICard title="Risco Respirat." val={`${kpis.avgRespRisk}%`} sub="Meta: < 5%" icon={<Wind size={16} />} color="text-blue-500" bg="bg-blue-500/10" border="border-blue-500/20" />
-        <KPICard title="Risco Entérico" val={`${kpis.avgEntericRisk}%`} sub="Meta: < 5%" icon={<Beaker size={16} />} color="text-orange-500" bg="bg-orange-500/10" border="border-orange-500/20" />
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+              <AlertTriangle size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Em Atenção</h3>
+          </div>
+          <div>
+            <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.attentionCount}</p>
+            <p className="text-xs font-medium text-slate-400 mt-3">{kpis.attentionPct}% do total</p>
+          </div>
+        </div>
+
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center">
+              <AlertTriangle size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Críticos</h3>
+          </div>
+          <div>
+            <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.criticalCount}</p>
+            <p className="text-xs font-medium text-slate-400 mt-3">{kpis.criticalPct}% do total</p>
+          </div>
+        </div>
       </div>
 
-      {/* Row 2: Charts & Ranks */}
-      <div className="export-layout-row2 grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+      {/* Row 2: KPIs Bottom */}
+      <div className="export-layout-row2 grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+              <Activity size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Mortalidade</h3>
+          </div>
+          <div className="flex items-end gap-3 mt-1">
+             <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.avgMortality}%</p>
+          </div>
+          <p className="text-xs font-medium text-slate-400 mt-3">Média: 1,00% a 0,30%</p>
+        </div>
+
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+              <Wind size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Risco Respirat.</h3>
+          </div>
+          <div className="flex items-end gap-3 mt-1">
+             <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.avgRespRisk}%</p>
+          </div>
+          <p className="text-xs font-medium text-slate-400 mt-3">Média: 5%</p>
+        </div>
+
+        <div className="bg-[#1E293B] border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-500 flex items-center justify-center">
+              <ShieldCheck size={18} />
+            </div>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-widest">Risco Entérico</h3>
+          </div>
+          <div className="flex items-end gap-3 mt-1">
+             <p className="text-4xl font-bold text-white font-mono leading-none tracking-tight">{kpis.avgEntericRisk}%</p>
+          </div>
+          <p className="text-xs font-medium text-slate-400 mt-3">Média: 1%</p>
+        </div>
+      </div>
+
+      {/* Row 3: Donut & Ranking */}
+      <div className="export-layout-row3 grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         
         {/* Panel 1 */}
-        <div className="bg-[#1E293B] border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col">
+        <div className="bg-[#1E293B] border border-slate-700 rounded-xl p-6 shadow-lg flex flex-col">
           <h2 className="text-sm font-semibold text-slate-200 mb-4 flex items-center gap-2">
             Status Sanitário <span className="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300">Tempo Real</span>
           </h2>
@@ -502,6 +551,7 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                     stroke="none"
                     paddingAngle={5}
                     dataKey="value"
+                    isAnimationActive={!isExporting}
                     onClick={(_, index) => setFilterMode(donutData[index].name)}
                     className="cursor-pointer"
                   >
@@ -536,42 +586,49 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
           <h2 className="text-sm font-semibold text-slate-200 mb-4">Top Ranking Sanitário</h2>
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
             <table className="w-full text-left text-sm">
-              <thead className="bg-[#0F172A]/50 sticky top-0 z-10">
+              <thead className="bg-[#0F172A]/80 border-b border-slate-700">
                 <tr>
-                  <th className="py-2 px-3 text-[10px] text-slate-400 font-semibold uppercase rounded-l-md">Pos</th>
-                  <th className="py-2 px-3 text-[10px] text-slate-400 font-semibold uppercase">Cliente</th>
-                  <th className="py-2 px-3 text-[10px] text-slate-400 font-semibold uppercase">Índice</th>
-                  <th className="py-2 px-3 text-[10px] text-slate-400 font-semibold uppercase rounded-r-md text-right">Tendência</th>
+                  <th className="py-3 px-3 text-[10px] text-slate-400 font-bold uppercase rounded-tl-md">Pos</th>
+                  <th className="py-3 px-3 text-[10px] text-slate-400 font-bold uppercase">Cliente</th>
+                  <th className="py-3 px-3 text-[10px] text-slate-400 font-bold uppercase">Índice</th>
+                  <th className="py-3 px-3 text-[10px] text-slate-400 font-bold uppercase rounded-tr-md text-right">Tendência</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-700/50">
                 {(expandedRanking ? ranking : ranking.slice(0, 5)).map((p) => (
-                  <tr key={p.id} className="border-b border-slate-700/50 hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => toggleProducerPanel(p)}>
-                    <td className="py-2.5 px-3">
+                  <tr key={p.id} className="hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => toggleProducerPanel(p)}>
+                    <td className="py-3 px-3">
                       <span className={cn(
-                        "text-xs font-bold w-5 h-5 flex items-center justify-center rounded",
-                        p.rank === 1 ? "bg-amber-500/20 text-amber-500" :
-                        p.rank === 2 ? "bg-slate-300/20 text-slate-300" :
-                        p.rank === 3 ? "bg-orange-700/20 text-orange-400" : "text-slate-500"
+                        "text-xs font-bold w-6 h-6 flex items-center justify-center rounded",
+                        p.rank === 1 ? "bg-amber-600/30 text-amber-500" :
+                        p.rank === 2 ? "bg-slate-500/30 text-slate-300" :
+                        p.rank === 3 ? "bg-orange-700/30 text-orange-400" : "bg-slate-800 text-slate-500"
                       )}>{p.rank}</span>
                     </td>
-                    <td className="py-2.5 px-3 truncate max-w-[120px]">
-                      <div className="font-medium text-slate-200">{p.producer}</div>
-                      <div className="text-[10px] text-slate-500 font-normal">{p.farm}</div>
+                    <td className="py-3 px-3 truncate max-w-[120px]">
+                      <div className="font-bold text-slate-200">{p.producer}</div>
+                      <div className="text-[11px] text-slate-500 font-normal">{p.farm}</div>
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-3 px-3">
                       <span className={cn(
-                        "font-mono",
-                        p.results?.scoreStatus === 'Excelente' ? 'text-green-400' :
-                        p.results?.scoreStatus === 'Atenção' ? 'text-amber-400' : 'text-red-400'
+                        "font-mono font-bold text-lg",
+                        p.results?.scoreStatus === 'Excelente' ? 'text-green-500' :
+                        p.results?.scoreStatus === 'Atenção' ? 'text-amber-500' : 'text-red-500'
                       )}>{p.results?.score}</span>
                     </td>
-                    <td className="py-2.5 px-3 text-right">
-                      {p.trend >= 0 ? (
-                        <span className="text-green-500 text-xs font-mono">↑{p.trend}</span>
-                      ) : (
-                        <span className="text-red-500 text-xs font-mono">↓{Math.abs(p.trend)}</span>
-                      )}
+                    <td className="py-3 px-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <svg className="w-8 h-4 sparkline" viewBox="0 0 30 10">
+                          {p.trend >= 0 ? (
+                            <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
+                          ) : (
+                            <path d="M0,0 Q10,2 15,6 T30,10" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+                          )}
+                        </svg>
+                        <span className={cn("text-xs font-mono font-bold w-8", p.trend >= 0 ? "text-green-500" : "text-red-500")}>
+                          {p.trend >= 0 ? '↑' : '↓'}{Math.abs(p.trend)}
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -603,46 +660,10 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
             </table>
           </div>
         </div>
-
-        {/* Panel 3: Evolution Line */}
-        <div className="bg-[#1E293B] border border-slate-700 rounded-xl p-5 shadow-lg flex flex-col">
-          <h2 className="text-sm font-semibold text-slate-200 mb-4 flex justify-between">
-            Evolução do Índice 
-            <span className="text-[10px] text-slate-400">{kpis.avgScore} pts atual</span>
-          </h2>
-          <div className="flex-1 -ml-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timelineData}>
-                <defs>
-                  <linearGradient id="colorIndex" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22C55E" stopOpacity={0.4}/>
-                    <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="name" hide />
-                <YAxis domain={['auto', 100]} hide />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#1E293B', borderColor: '#334155', color: '#F8FAFC', borderRadius: '8px' }}
-                  labelStyle={{ display: 'none' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="Índice" 
-                  stroke="#22C55E" 
-                  strokeWidth={3} 
-                  fillOpacity={1} 
-                  fill="url(#colorIndex)" 
-                  activeDot={{ r: 6, fill: '#22C55E', stroke: '#0F172A', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
       </div>
 
-      {/* Row 3: Main Table & Sideline */}
-      <div className="export-layout-row3 flex flex-col xl:flex-row gap-6">
+      {/* Row 4: Main Table & Sideline */}
+      <div className="export-layout-row4 flex flex-col xl:flex-row gap-6">
         
         {/* Smart Table */}
         <div className="flex-1 bg-[#1E293B] border border-slate-700 rounded-xl shadow-lg overflow-hidden flex flex-col">
@@ -651,42 +672,44 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
               <Filter size={16} className="text-slate-400" />
               Clientes — Visão Geral
             </h2>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex bg-[#0F172A] p-1 rounded-lg border border-slate-700">
-                {['Todos', 'Excelente', 'Atenção', 'Crítico'].map(f => (
-                  <button 
-                    key={f}
-                    onClick={() => setFilterMode(f)}
-                    className={cn(
-                      "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
-                      filterMode === f ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-                    )}
-                  >
-                    {f}
-                  </button>
-                ))}
+            {!isExporting && (
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex bg-[#0F172A] p-1 rounded-lg border border-slate-700">
+                  {['Todos', 'Excelente', 'Atenção', 'Crítico'].map(f => (
+                    <button 
+                      key={f}
+                      onClick={() => setFilterMode(f)}
+                      className={cn(
+                        "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                        filterMode === f ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+                      )}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Buscar cliente, produtor ou lote..." 
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="bg-[#0F172A] border border-slate-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 transition-colors text-slate-200 placeholder:text-slate-500 w-full md:w-auto"
+                />
               </div>
-              <input 
-                type="text" 
-                placeholder="Buscar cliente, produtor ou lote..." 
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="bg-[#0F172A] border border-slate-700 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-indigo-500 transition-colors text-slate-200 placeholder:text-slate-500 w-full md:w-auto"
-              />
-            </div>
+            )}
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm whitespace-nowrap">
-              <thead className="bg-[#0F172A]/80">
+              <thead className="bg-[#0F172A]/80 border-b border-slate-700">
                 <tr>
-                  <th className="py-3 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cliente</th>
-                  <th className="py-3 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Índice</th>
-                  <th className="py-3 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Mortalidade</th>
-                  <th className="py-3 px-4 text-[10px] text-blue-400/80 font-bold uppercase tracking-wider">Respiratório</th>
-                  <th className="py-3 px-4 text-[10px] text-orange-400/80 font-bold uppercase tracking-wider">Entérico</th>
-                  <th className="py-3 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tendência</th>
-                  <th className="py-3 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider rounded-tr-xl">Status</th>
+                  <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Cliente</th>
+                  <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Índice</th>
+                  <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider">Mortalidade</th>
+                  <th className="py-4 px-4 text-[10px] text-blue-400 font-bold uppercase tracking-wider">Respiratório</th>
+                  <th className="py-4 px-4 text-[10px] text-orange-400 font-bold uppercase tracking-wider">Entérico</th>
+                  <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">Tendência</th>
+                  <th className="py-4 px-4 text-[10px] text-slate-400 font-bold uppercase tracking-wider text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
@@ -698,58 +721,47 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                       key={p.id} 
                       onClick={() => toggleProducerPanel(p)}
                       className={cn(
-                        "group cursor-pointer transition-colors hover:bg-[#243247]",
+                        "group cursor-pointer transition-colors hover:bg-slate-800/50",
                         isCrit ? "bg-red-950/10 hover:bg-red-900/20" : ""
                       )}
                     >
-                      <td className="py-3 px-4 font-semibold text-slate-200">
-                        {p.producer}
-                        <div className="text-[10px] font-normal text-slate-500">{p.farm}</div>
+                      <td className="py-4 px-4 text-slate-200">
+                        <div className="font-bold">{p.producer}</div>
+                        <div className="text-[11px] font-normal text-slate-500">{p.farm}</div>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={cn(
-                            "font-mono font-bold",
-                            r.score >= 85 ? "text-green-500" :
-                            r.score >= 70 ? "text-amber-500" : "text-red-500"
-                          )}>{r.score}</span>
-                          <div className="w-12 h-1.5 bg-slate-800 rounded-full overflow-hidden hidden sm:block">
-                            <div 
-                              className={cn("h-full rounded-full",
-                                r.score >= 85 ? "bg-green-500" :
-                                r.score >= 70 ? "bg-amber-500" : "bg-red-500"
-                              )} 
-                              style={{ width: `${Math.max(10, r.score)}%` }}
-                            ></div>
-                          </div>
-                        </div>
+                      <td className="py-4 px-4">
+                        <span className={cn(
+                          "font-mono font-bold text-lg",
+                          r.score >= 85 ? "text-green-500" :
+                          r.score >= 70 ? "text-amber-500" : "text-red-500"
+                        )}>{r.score}</span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className={cn(
                           "font-mono",
                           r.mortalityRate > r.mortalityMeta ? "text-red-400 font-semibold" : "text-slate-300"
                         )}>
-                          {r.mortalityRate.toFixed(2)}%
+                          {r.mortalityRate.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className={cn(
                           "font-mono",
-                          (r.cFreq + r.sFreq) > 5 ? "text-amber-400" : "text-slate-300"
+                          (r.cFreq + r.sFreq) > 5 ? "text-blue-400 font-bold" : "text-blue-400/80"
                         )}>
                           {(r.cFreq + r.sFreq).toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4">
                         <span className={cn(
                           "font-mono",
-                          (r.liqFreq) > 5 ? "text-amber-400" : "text-slate-300"
+                          (r.liqFreq) > 5 ? "text-orange-400 font-bold" : "text-orange-400/80"
                         )}>
                           {(r.liqFreq).toFixed(1)}%
                         </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="w-8 flex">
+                      <td className="py-4 px-4 flex justify-center">
+                        <div className="w-8 flex items-center h-full">
                           <svg className="w-full h-4 sparkline" viewBox="0 0 30 10">
                             {p.trend >= 0 ? (
                               <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
@@ -759,12 +771,12 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                           </svg>
                         </div>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-4 px-4 text-center">
                         <span className={cn(
-                          "px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider",
-                          r.scoreStatus === 'Excelente' ? "bg-green-500/10 text-green-400 border border-green-500/20" :
-                          r.scoreStatus === 'Atenção' ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : 
-                          "bg-red-500/10 text-red-400 border border-red-500/20"
+                          "px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider",
+                          r.scoreStatus === 'Excelente' ? "bg-green-500/10 text-green-500 border border-green-500/20" :
+                          r.scoreStatus === 'Atenção' ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" : 
+                          "bg-red-500/10 text-red-500 border border-red-500/20"
                         )}>{r.scoreStatus}</span>
                       </td>
                     </tr>
@@ -803,6 +815,11 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                 )}
               </tbody>
             </table>
+          </div>
+          {/* Added Evolucao do indice here to match image bottom-left layout */}
+          <div className="p-4 border-t border-slate-700 flex justify-between items-center text-sm font-semibold text-slate-200">
+            Evolução do Índice
+            <span className="text-slate-400 font-normal">{kpis.avgScore} pts atual</span>
           </div>
         </div>
 

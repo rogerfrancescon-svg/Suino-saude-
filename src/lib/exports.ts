@@ -9,8 +9,6 @@ import AppLogo from '../assets/images/regenerated_image_1781570211120.png';
 // Extending jsPDF with autotable types
 declare module 'jspdf' {
   interface jsPDF {
-    GState: any;
-    setGState: (state: any) => void;
     autoTable: any;
     lastAutoTable: {
       finalY: number;
@@ -43,9 +41,9 @@ export async function exportToPDF(records: VisitData[]) {
       
       // Setup overlay for readability
       doc.setFillColor(15, 23, 42); // match dark theme
-      doc.setGState(new doc.GState({ opacity: 0.85 }));
+      doc.setGState(new (doc.GState as any)({ opacity: 0.85 }));
       doc.rect(0, 0, W, headerHeight, 'F');
-      doc.setGState(new doc.GState({ opacity: 1.0 }));
+      doc.setGState(new (doc.GState as any)({ opacity: 1.0 }));
     } catch {
       // Fallback if image base doesn't work
       doc.setFillColor(15, 23, 42);
