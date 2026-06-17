@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { VisitData } from '../types';
-import { FileText, Table as TableIcon, MessageSquare, Trash2, CheckSquare, Square, Download, Upload, AlertCircle, CloudUpload, CloudDownload, LogOut, LogIn, ExternalLink } from 'lucide-react';
-import { cn, formatDateBR } from '../lib/utils';
+import { FileText, Table as TableIcon, MessageSquare, Trash2, CheckSquare, Square, Download, Upload, AlertCircle, CloudUpload, CloudDownload, LogOut, LogIn, ExternalLink, X, Copy } from 'lucide-react';
+import { cn, formatDateBR, calculateHousingDays } from '../lib/utils';
 import { exportBackupToExcel, importBackupFromExcel } from '../lib/exports';
 import { googleSignIn, initAuth, logout, syncHistoryToSheets, fetchHistoryFromSheets, getOnlineSpreadsheetUrl } from '../lib/syncOAuth';
 import { User } from 'firebase/auth';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface Props {
   history: VisitData[];
@@ -13,10 +14,11 @@ interface Props {
   onExportPDF: (records: VisitData[]) => void;
   onExportExcel: (records: VisitData[]) => void;
   onExportWhatsApp: (records: VisitData[]) => void;
+  onExportCompiledPDF: (records: VisitData[]) => Promise<string>;
   onEdit: (visit: VisitData) => void;
 }
 
-export default function HistoryScreen({ history, setHistory, onDeleteSelected, onExportPDF, onExportExcel, onExportWhatsApp, onEdit }: Props) {
+export default function HistoryScreen({ history, setHistory, onDeleteSelected, onExportPDF, onExportExcel, onExportWhatsApp, onExportCompiledPDF, onEdit }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -26,6 +28,8 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
   const [isOnlineSyncing, setIsOnlineSyncing] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
+  const [compiledPreviewRecords, setCompiledPreviewRecords] = useState<VisitData[] | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const fetchUrl = async () => {
     try {
@@ -103,6 +107,81 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
     return history.filter(h => selectedIds.includes(h.id));
   };
 
+  const handlePreviewCompiledReport = async () => {
+    try {
+      const records = getTargetRecords();
+      if (records.length === 0) {
+        alert("Selecione pelo menos um registro para gerar o relatório.");
+        return;
+      }
+      setCompiledPreviewRecords(records);
+    } catch (err) {
+      console.error('Error generating preview:', err);
+      alert('Erro ao gerar relatório: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
+  const downloadCompiledReport = async () => {
+    if (!compiledPreviewRecords) return;
+    try {
+      setIsExportingPDF(true);
+      const url = await onExportCompiledPDF(compiledPreviewRecords);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Relatorio_Descritivo_Compilado_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error downloading pdf:', err);
+      alert('Erro ao baixar PDF.');
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  const copyCompiledReportToClipboard = async () => {
+    if (!compiledPreviewRecords) return;
+    
+    let textToCopy = 'SUINO SAÚDE - RELATÓRIO DESCRITIVO COMPILADO\n';
+    textToCopy += `Data de Geração: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+
+    compiledPreviewRecords.forEach((record, index) => {
+      const scoreStatus = record.results?.scoreStatus || 'Desconhecido';
+      const score = record.results?.score || 0;
+      
+      let ageStr = 'Não informada';
+      if (record.housingDate && record.date) {
+        const days = calculateHousingDays(record.housingDate, record.date);
+        if (days !== '?') ageStr = `${days} dias`;
+      }
+
+      const observationText = record.notes && record.notes.trim() ? record.notes.trim() : "Nenhuma observação registrada para este lote.";
+
+      textToCopy += `--- Lote ${index + 1} ---\n`;
+      textToCopy += `Cliente: ${record.producer}\n`;
+      textToCopy += `Produtor: ${record.farm}\n`;
+      textToCopy += `Lote: ${record.batch || 'N/I'} | Data: ${formatDateBR(record.date)} | Fase: ${record.phase || 'N/I'}\n`;
+      textToCopy += `Índice Sanitário: ${score}/100 (${scoreStatus})\n`;
+      textToCopy += `Idade do Lote: ${ageStr}\n`;
+      textToCopy += `Efetivo: ${record.totalAnimals} animais\n`;
+      textToCopy += `Respiratório (Tosses/Espirros): ${record.results?.cFreq.toFixed(1)}% (Meta: 5%) / ${record.results?.sFreq.toFixed(1)}% (Meta: 10%)\n`;
+      textToCopy += `Entérico (Diarreia Líquida): ${record.results?.liqFreq.toFixed(1)}% (Meta: 5%)\n`;
+      textToCopy += `Mortalidade: ${record.results?.mortalityRate.toFixed(1)}% (Meta: ${record.results?.mortalityMeta.toFixed(1)}%)\n`;
+      textToCopy += `Ambiência (Temp/Umid/CO2): ${record.temp ? record.temp + '°C' : 'N/I'} / ${record.humidity ? record.humidity + '%' : 'N/I'} / ${record.co2 ? record.co2 + 'ppm' : 'N/I'}\n`;
+      textToCopy += `Ração Atual: ${record.feed || 'Não informada'}\n`;
+      textToCopy += `Observações: ${observationText}\n\n`;
+    });
+
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      alert('Informações copiadas para a área de transferência!');
+    } catch (err) {
+      console.error('Falha ao copiar:', err);
+      alert('Falha ao tentar copiar o texto.');
+    }
+  };
+
   const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -158,33 +237,43 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
         </h3>
         
         <div className="bg-[var(--surface-hover)] p-4 rounded-xl border border-[var(--border)] space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-brand-primary-light bg-brand-primary/10 px-2 py-1 rounded">
-              {selectedIds.length} selecionados
+          <div className="mb-4">
+            <button 
+              onClick={handlePreviewCompiledReport}
+              className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black uppercase rounded-xl transition-all shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] active:scale-[0.98]"
+            >
+              <FileText size={20} /> 
+              Gerar Relatório Descritivo Completo (Layout Centralizado)
+            </button>
+          </div>
+
+          <div className="flex justify-between items-center bg-[var(--surface-color)] p-2 rounded-lg border border-[var(--border)]">
+            <span className="text-xs font-bold text-brand-primary-light bg-brand-primary/10 px-3 py-1.5 rounded-md">
+              {selectedIds.length} lotes selecionados
             </span>
             <div className="flex gap-2">
-               <button onClick={selectAll} className="text-[10px] font-bold uppercase text-brand-primary-light hover:underline">Selecionar Tudo</button>
+               <button onClick={selectAll} className="text-xs font-bold uppercase text-brand-primary-light hover:underline px-2">Todos</button>
                <span className="text-[var(--border)]">|</span>
-               <button onClick={clearSelection} className="text-[10px] font-bold uppercase text-[var(--text-muted)] hover:underline">Limpar</button>
+               <button onClick={clearSelection} className="text-xs font-bold uppercase text-[var(--text-muted)] hover:underline px-2">Limpar</button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <button 
               onClick={() => onExportPDF(getTargetRecords())}
-              className="flex items-center justify-center gap-2 py-2.5 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 py-2.5 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
             >
-              <FileText size={16} /> PDF
+              <FileText size={16} /> Ficha Analítica (PDF)
             </button>
             <button 
               onClick={() => onExportExcel(getTargetRecords())}
-              className="flex items-center justify-center gap-2 py-2.5 bg-brand-success hover:bg-brand-success-light text-white text-xs font-bold rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 py-2.5 bg-brand-success hover:bg-brand-success-light text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
             >
-              <TableIcon size={16} /> Excel
+              <TableIcon size={16} /> Exportar Excel
             </button>
             <button 
               onClick={() => onExportWhatsApp(getTargetRecords())}
-              className="flex items-center justify-center gap-2 py-2.5 border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--border)] text-xs font-bold rounded-lg transition-colors"
+              className="flex items-center justify-center gap-2 py-2.5 border border-[var(--border)] text-[var(--text-main)] hover:bg-[var(--surface-color)] bg-[var(--surface-input)] text-xs font-bold rounded-lg transition-colors shadow-sm"
             >
               <MessageSquare size={16} /> WhatsApp
             </button>
@@ -392,6 +481,152 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
           ))
         )}
       </div>
+
+      {/* Preview Modal */}
+      <AnimatePresence>
+        {compiledPreviewRecords && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[var(--surface-color)] border border-[var(--border)] rounded-2xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--surface-input)]">
+                <h2 className="text-lg font-bold text-[var(--text-main)] flex items-center gap-2">
+                  <FileText className="text-indigo-500" />
+                  Pré-visualização do Relatório ({compiledPreviewRecords.length} lotes)
+                </h2>
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={copyCompiledReportToClipboard}
+                    className="flex items-center gap-2 px-4 py-2 bg-[var(--surface-hover)] border border-[var(--border)] hover:bg-[var(--border)] text-[var(--text-main)] text-sm font-bold rounded-lg transition-colors shadow-sm"
+                  >
+                    <Copy size={16} /> Copiar Texto
+                  </button>
+                  <button 
+                    onClick={downloadCompiledReport}
+                    disabled={isExportingPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded-lg transition-colors shadow-lg disabled:opacity-50"
+                  >
+                    <Download size={16} /> {isExportingPDF ? 'Gerando PDF...' : 'Baixar PDF'}
+                  </button>
+                  <button 
+                    onClick={() => setCompiledPreviewRecords(null)}
+                    className="p-2 text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 bg-[var(--surface-color)] p-6 overflow-y-auto custom-scrollbar space-y-6">
+                <div className="text-center mb-8 border-b border-[var(--border)] pb-6">
+                  <h1 className="text-3xl font-extrabold text-[var(--text-main)] tracking-tight">SUINO SAÚDE</h1>
+                  <h2 className="text-lg font-semibold text-[var(--text-muted)] mt-1">RELATÓRIO DESCRITIVO COMPILADO</h2>
+                  <p className="text-sm text-[var(--text-muted)] mt-2">Data de Geração: {new Date().toLocaleDateString('pt-BR')}</p>
+                </div>
+
+                {compiledPreviewRecords.map((record, index) => {
+                  const scoreStatus = record.results?.scoreStatus || 'Desconhecido';
+                  const score = record.results?.score || 0;
+                  
+                  let ageStr = 'Não informada';
+                  if (record.housingDate && record.date) {
+                    const days = calculateHousingDays(record.housingDate, record.date);
+                    if (days !== '?') ageStr = `${days} dias`;
+                  }
+
+                  const observationText = record.notes && record.notes.trim() ? record.notes.trim() : "Nenhuma observação registrada para este lote.";
+
+                  return (
+                    <div key={record.id} className="bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl p-5 mb-4 shadow-sm">
+                      <div className="flex flex-col md:flex-row justify-between mb-4 pb-4 border-b border-[var(--border)]">
+                        <div>
+                          <h3 className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider mb-1">
+                            Lote {index + 1}
+                          </h3>
+                          <p className="text-lg font-bold text-[var(--text-main)]">{record.producer} - {record.farm}</p>
+                          <p className="text-sm text-[var(--text-muted)] mt-1">
+                            Lote: <span className="font-semibold text-slate-300">{record.batch || 'N/I'}</span> | 
+                            Data: <span className="font-semibold text-slate-300">{formatDateBR(record.date)}</span> | 
+                            Fase: <span className="font-semibold text-slate-300">{record.phase || 'N/I'}</span>
+                          </p>
+                        </div>
+                        <div className="mt-3 md:mt-0 md:text-right flex flex-col md:items-end justify-center">
+                           <span className={cn(
+                             "px-3 py-1 text-xs font-bold uppercase rounded-full mb-2",
+                             scoreStatus === 'Excelente' ? 'bg-green-500/20 text-green-400' :
+                             scoreStatus === 'Atenção' ? 'bg-amber-500/20 text-amber-400' :
+                             'bg-red-500/20 text-red-400'
+                           )}>
+                             {scoreStatus}
+                           </span>
+                           <span className="text-xl font-black text-[var(--text-main)]">{score}<span className="text-sm font-normal text-[var(--text-muted)]">/100</span></span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Idade do Lote</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">{ageStr}</p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Efetivo</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">{record.totalAnimals} animais</p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Mortalidade</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">
+                            {record.results?.mortalityRate.toFixed(1)}% 
+                            <span className="text-xs font-normal text-[var(--text-muted)] ml-1">
+                              (Meta: {record.results?.mortalityMeta.toFixed(1)}%)
+                            </span>
+                          </p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Ração Atual</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)] truncate" title={record.feed || 'N/I'}>{record.feed || 'N/I'}</p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)] col-span-2 md:col-span-2">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Ambiência (T/U/CO2)</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">
+                            {record.temp ? record.temp + '°C' : 'N/I'} / {record.humidity ? record.humidity + '%' : 'N/I'} / {record.co2 ? record.co2 + 'ppm' : 'N/I'}
+                          </p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Tosses / Espirros</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">
+                            {record.results?.cFreq.toFixed(1)}% <span className="text-xs font-normal text-[var(--text-muted)] ml-0.5">(Meta: 5%)</span> / {record.results?.sFreq.toFixed(1)}% <span className="text-xs font-normal text-[var(--text-muted)] ml-0.5">(Meta: 10%)</span>
+                          </p>
+                        </div>
+                        <div className="bg-[var(--surface-color)] p-3 rounded-lg border border-[var(--border)]">
+                          <p className="text-[10px] uppercase text-[var(--text-muted)] font-bold mb-1">Diarreia Líquida</p>
+                          <p className="text-sm font-semibold text-[var(--text-main)]">
+                            {record.results?.liqFreq.toFixed(1)}% <span className="text-xs font-normal text-[var(--text-muted)] ml-1">(Meta: 5%)</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="bg-[var(--surface-input)] p-4 rounded-lg border border-[var(--border)]">
+                        <h4 className="text-xs font-bold uppercase text-[var(--text-muted)] mb-2">Observações / Notas do Lote</h4>
+                        <p className="text-sm text-[var(--text-main)] leading-relaxed italic">
+                          {observationText}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

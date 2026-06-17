@@ -12,7 +12,7 @@ import {
 import { VisitData, Phase, Duration } from './types';
 import { cn } from './lib/utils';
 import { calculateVisitResults } from './lib/scoring';
-import { exportToPDF, exportToExcel, exportToWhatsApp } from './lib/exports';
+import { exportToPDF, exportToExcel, exportToWhatsApp, generateCompiledReportPDFBlob } from './lib/exports';
 
 // Import Screens
 import RegistrationScreen from './components/RegistrationScreen';
@@ -120,6 +120,50 @@ export default function App() {
         ...getSeededVisits()
       ];
     }
+
+    // Migrate correct housing dates for Pastre
+    const housingDateFixes: Record<string, string> = {
+      "Luiz Forchezatto": "2026-04-07",
+      "Jarlei Toniello": "2026-02-10",
+      "Eladio Cumerlato": "2026-03-11",
+      "Laudir Galante": "2026-04-14",
+      "Violar Ferrari": "2026-03-30",
+      "Tanamara Kirst": "2026-05-04",
+      "Jones Gemi": "2026-04-07",
+      "Wanderlei Richit": "2026-03-23",
+      "Delcio Renosto": "2026-03-27",
+      "Delcio Renostro": "2026-03-27",
+      "Roni José Zanela": "2026-05-05",
+      "Gilmar Miglioretto": "2026-05-28",
+      "Altivo Dani": "2026-04-21",
+      "Valdecir Forchezato": "2026-03-02",
+      "Valdecir Forchezatto": "2026-03-02",
+      "José Trojan": "2026-05-11",
+      "Jose Trojan": "2026-05-11",
+      "Jose trojan": "2026-05-11",
+      "José Trojan Neto": "2026-05-11",
+      "Gilar Zanella": "2026-05-05"
+    };
+
+    parsedHistory = parsedHistory.map((h: any) => {
+      let isChanged = false;
+      if (h.producer === 'Pastre' && h.farm) {
+        let mappedDate = housingDateFixes[h.farm];
+        if (!mappedDate) {
+          const match = Object.entries(housingDateFixes).find(([k]) => k.toLowerCase() === h.farm.toLowerCase());
+          if (match) mappedDate = match[1];
+        }
+        if (mappedDate && h.housingDate !== mappedDate) {
+          h.housingDate = mappedDate;
+          isChanged = true;
+        }
+      }
+      if (isChanged) {
+        h.results = calculateVisitResults(h);
+      }
+      return h;
+    });
+
     return parsedHistory;
   });
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -420,6 +464,7 @@ export default function App() {
                   onExportPDF={exportToPDF}
                   onExportExcel={exportToExcel}
                   onExportWhatsApp={exportToWhatsApp}
+                  onExportCompiledPDF={generateCompiledReportPDFBlob}
                   onEdit={handleEditVisit}
                 />
               )}

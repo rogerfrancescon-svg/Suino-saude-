@@ -10,26 +10,7 @@ import {
   ChevronRight, RefreshCcw, Check, ChevronDown, X, CheckCircle, AlertTriangle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const calculateHousingDays = (housingDateStr?: string, visitDateStr?: string) => {
-  if (!housingDateStr || !visitDateStr) return '?';
-  try {
-    const parseDate = (dStr: string) => {
-      if (!dStr) throw new Error('Invalid');
-      const parts = dStr.split('T')[0].split('-');
-      if (parts.length < 3) throw new Error('Invalid');
-      const [y, m, d] = parts;
-      return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
-    };
-    const hd = parseDate(housingDateStr);
-    const vd = parseDate(visitDateStr);
-    if (isNaN(hd.getTime()) || isNaN(vd.getTime())) return '?';
-    const diffTime = vd.getTime() - hd.getTime();
-    return Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
-  } catch(e) {
-    return '?';
-  }
-};
+import { calculateHousingDays } from '../lib/utils';
 
 interface Props {
   history: VisitData[];

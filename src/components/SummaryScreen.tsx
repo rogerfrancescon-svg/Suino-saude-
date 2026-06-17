@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, ReferenceLine, LabelList
 } from 'recharts';
 import { ShieldCheck, AlertTriangle, XCircle, BarChart3, TrendingUp, PieChart as PieChartIcon, ChevronDown, ChevronUp, Share2, ImageIcon, FileText, CheckCircle, Activity, AirVent } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, formatDateBR, calculateHousingDays } from '../lib/utils';
 import { exportToPDF } from '../lib/exports';
 
 interface Props {
@@ -99,117 +99,56 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
             </p>
           </div>
           {isReadOnly && (
-            <button 
-              onClick={handleExportPDF}
-              disabled={isExporting}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--surface-hover)] border border-[var(--border)] text-sm font-bold rounded-lg hover:bg-brand-primary/10 hover:text-brand-primary transition-colors disabled:opacity-50"
-            >
-              <Share2 size={16} /> 
-              {isExporting ? 'Processando...' : 'Exportar PDF'}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    setIsExporting(true);
+                    await new Promise(r => setTimeout(r, 150)); // let react update opacity to 1
+                    const { toPng } = await import('html-to-image');
+                    const element = document.getElementById('summary-export-image-target');
+                    if (!element) return;
+                    
+                    const dataUrl = await toPng(element, {
+                      pixelRatio: 2,
+                      backgroundColor: '#FFFFFF',
+                      style: {
+                        opacity: '1'
+                      }
+                    });
+                    
+                    const link = document.createElement('a');
+                    link.download = `Resumo_${data.producer || 'Produtor'}_${data.date || 'Data'}.png`;
+                    link.href = dataUrl;
+                    link.click();
+                  } catch (e) {
+                    console.error('Export error:', e);
+                  } finally {
+                    setIsExporting(false);
+                  }
+                }}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--surface-hover)] border border-[var(--border)] text-sm font-bold rounded-lg hover:bg-brand-primary/10 hover:text-brand-primary transition-colors disabled:opacity-50"
+              >
+                <ImageIcon size={16} />
+                Exportar Imagem
+              </button>
+              <button 
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--surface-hover)] border border-[var(--border)] text-sm font-bold rounded-lg hover:bg-brand-primary/10 hover:text-brand-primary transition-colors disabled:opacity-50"
+              >
+                <FileText size={16} /> 
+                {isExporting ? 'Processando...' : 'Exportar PDF'}
+              </button>
+            </div>
           )}
-        </div>
-      </div>
-
-      <div className="space-y-4 mb-6">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2 px-1">
-          📋 Informações do Lote
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Identificação */}
-          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Identificação</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Produtor / Granja</p>
-                <p className="font-medium">{data.producer || '-'} {data.farm ? `— ${data.farm}` : ''}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data da Visita</p>
-                <p className="font-medium">{data.date ? new Date(data.date).toLocaleDateString('pt-BR') : '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Fase de Produção</p>
-                <p className="font-medium">{data.phase || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Lote / Galpão</p>
-                <p className="font-medium">{data.batch || '-'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Dados Produtivos */}
-          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Dados Produtivos</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Animais Alojados</p>
-                <p className="font-medium">{data.totalAnimals || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data de Alojamento</p>
-                <p className="font-medium">{data.housingDate ? new Date(data.housingDate).toLocaleDateString('pt-BR') : '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Idade do Lote</p>
-                <p className="font-medium">
-                  {data.housingDate && data.date 
-                    ? `${Math.max(0, Math.floor((new Date(data.date).getTime() - new Date(data.housingDate).getTime()) / (1000 * 60 * 60 * 24)))} dias` 
-                    : '-'}
-                </p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
-                <p className="font-medium text-brand-danger">{data.mortality || '0'} ({results.mortalityRate?.toFixed(2) || '0.00'}%)</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Nutrição e Medicamentos */}
-          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Nutrição & Medicamentos</h4>
-            <div className="grid grid-cols-1 gap-3">
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Ração / Água</p>
-                <p className="font-medium">{data.feed || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Medicamentos (Via ração/água)</p>
-                <p className="font-medium">{data.meds || '-'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Ambiente e Sinais Clínicos Básicos */}
-          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Ambiente & Sinais Clínicos</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Temperatura</p>
-                <p className="font-medium">{data.temp ? `${data.temp}°C` : '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Umidade</p>
-                <p className="font-medium">{data.humidity ? `${data.humidity}%` : '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Tosse / Baias</p>
-                <p className="font-medium">{data.counts?.cough || 0}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Espirro / Baias</p>
-                <p className="font-medium">{data.counts?.sneeze || 0}</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
-           <div className={cn("p-5 rounded-2xl relative overflow-hidden flex flex-col justify-center border", 
+           <div className={cn("p-5 rounded-2xl relative overflow-hidden flex flex-col justify-center border h-full", 
                results.score >= 85 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" : 
                results.score >= 70 ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400" : 
                "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400")}>
@@ -250,11 +189,123 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
              </div>
            )}
            {!data.temp && !data.co2 && (
-              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex-1 flex flex-col items-center justify-center text-center opacity-60">
+              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex-1 flex flex-col items-center justify-center text-center opacity-60 min-h-[120px]">
                  <AirVent size={24} className="mb-2" />
                  <p className="text-[10px] font-bold uppercase tracking-wider">Sem dados ambientais</p>
               </div>
            )}
+        </div>
+      </div>
+
+      <div className="space-y-4 mb-6">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2 px-1">
+          📋 Informações do Lote
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Identificação */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Identificação</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Produtor / Granja</p>
+                <p className="font-medium">{data.producer || '-'} {data.farm ? `— ${data.farm}` : ''}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data da Visita</p>
+                <p className="font-medium">{data.date ? formatDateBR(data.date) : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Fase de Produção</p>
+                <p className="font-medium">{data.phase || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Lote / Galpão</p>
+                <p className="font-medium">{data.batch || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Dados Produtivos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Dados Produtivos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Animais Alojados</p>
+                <p className="font-medium">{data.totalAnimals || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Data de Alojamento</p>
+                <p className="font-medium">{data.housingDate ? formatDateBR(data.housingDate) : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Idade do Lote</p>
+                <p className="font-medium">
+                  {data.housingDate && data.date 
+                    ? `${calculateHousingDays(data.housingDate, data.date)} dias` 
+                    : '-'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
+                <p className="font-medium text-brand-danger">{data.mortality || '0'} ({results.mortalityRate?.toFixed(2) || '0.00'}%)</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Nutrição e Medicamentos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Nutrição & Medicamentos</h4>
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Ração / Água</p>
+                <p className="font-medium">{data.feed || '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Medicamentos (Via ração/água)</p>
+                <p className="font-medium">{data.meds || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Ambiente e Sinais Clínicos Básicos */}
+          <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Ambiente & Sinais Clínicos</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Temperatura</p>
+                <p className="font-medium">{data.temp ? `${data.temp}°C` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Umidade</p>
+                <p className="font-medium">{data.humidity ? `${data.humidity}%` : '-'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
+                <p className="font-medium">
+                  {results.mortalityRate.toFixed(1)}% <span className="text-xs text-[var(--text-muted)]">(Meta: {results.mortalityMeta > 0 ? results.mortalityMeta.toFixed(1) : 0}%)</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Diarreia Líquida</p>
+                <p className="font-medium">
+                  {results.liqFreq.toFixed(1)}% <span className="text-xs text-[var(--text-muted)]">(Meta: 5.0%)</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Tosses</p>
+                <p className="font-medium">
+                  {results.cFreq.toFixed(1)}% <span className="text-xs text-[var(--text-muted)]">(Meta: 5.0%)</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Espirros</p>
+                <p className="font-medium">
+                  {results.sFreq.toFixed(1)}% <span className="text-xs text-[var(--text-muted)]">(Meta: 10.0%)</span>
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -454,7 +505,109 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
       )}
       </div>
 
-      {/* Removed Hidden Dashboard for image export */}
+      {/* Hidden Dashboard for clean image export */}
+      <div id="summary-export-image-target" style={{ position: 'absolute', left: 0, top: 0, width: '800px', backgroundColor: 'var(--bg)', padding: '24px', borderRadius: '16px', pointerEvents: 'none', opacity: isExporting ? 1 : 0, zIndex: -50 }} className="space-y-6">
+        <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
+          <div>
+            <h2 className="text-2xl font-bold" style={{ color: '#111827' }}>Painel de Resumo Sanitário</h2>
+            <p className="text-sm font-medium text-[var(--text-muted)] mt-1">
+              {data.producer || 'Produtor Sem Nome'} {data.farm ? `— ${data.farm}` : ''} | {data.date ? formatDateBR(data.date) : 'Data N/A'}
+            </p>
+          </div>
+          <div className="text-right">
+             <p className="text-xs uppercase font-bold text-[var(--text-muted)]">Idade do Lote</p>
+             <p className="text-lg font-black" style={{ color: '#3b82f6' }}>{data.housingDate && data.date ? `${calculateHousingDays(data.housingDate, data.date)} dias` : '-'}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-6">
+          <div className="p-5 rounded-2xl relative flex flex-col justify-center border"
+             style={
+               results.score >= 85 ? { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.2)', color: '#10b981' } : 
+               results.score >= 70 ? { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' } : 
+               { backgroundColor: 'rgba(244, 63, 94, 0.1)', borderColor: 'rgba(244, 63, 94, 0.2)', color: '#f43f5e' }
+             }>
+              <p className="text-[12px] font-bold tracking-widest uppercase mb-1 opacity-80 z-10">Índice Geral de Sanidade</p>
+              <div className="flex items-baseline gap-2 z-10 mb-2">
+                 <span className="text-5xl font-black leading-none tracking-tighter">{results.score}</span>
+                 <span className="text-lg font-bold opacity-60">/100</span>
+              </div>
+              <div className="mt-1 inline-block px-3 py-1 rounded-full z-10 border self-start"
+                 style={
+                  results.score >= 85 ? { backgroundColor: 'rgba(16, 185, 129, 0.2)', borderColor: 'rgba(16, 185, 129, 0.3)' } : 
+                  results.score >= 70 ? { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: 'rgba(245, 158, 11, 0.3)' } : 
+                  { backgroundColor: 'rgba(244, 63, 94, 0.2)', borderColor: 'rgba(244, 63, 94, 0.3)' }
+                 }>
+                 <span className="text-sm font-black tracking-widest uppercase" style={{ color: 'inherit' }}>{results.scoreStatus}</span>
+              </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {data.temp ? (
+              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex items-center gap-4 flex-1">
+                <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><Activity size={24} /></div>
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Temperatura</p>
+                  <p className="text-xl font-black text-[var(--text-main)]">{data.temp}°C</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-xl flex-1 flex items-center justify-center opacity-60">
+                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados térmicos</p>
+              </div>
+            )}
+            
+            {data.co2 ? (
+              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex items-center gap-4 flex-1">
+                <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><AirVent size={24} /></div>
+                <div>
+                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Concentração CO2</p>
+                  <p className="text-xl font-black text-[var(--text-main)]">{data.co2} ppm</p>
+                </div>
+              </div>
+             ) : (
+              <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-xl flex-1 flex items-center justify-center opacity-60">
+                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados ventilatórios</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 pb-2">
+          <div className="card rounded-xl p-5 bg-[var(--surface)] border border-[var(--border)]">
+            <h4 className="text-[10px] font-bold uppercase text-[var(--text-muted)] mb-4">Frequências vs. Limiares (%)</h4>
+            <div className="h-[200px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={11} tick={{ fill: 'var(--text-main)' }} />
+                   <YAxis tickCount={5} axisLine={false} tickLine={false} fontSize={11} tick={{ fill: 'var(--text-main)' }} />
+                   <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                     <LabelList dataKey="value" position="top" offset={10} fontSize={10} fill="var(--text-main)" fontWeight="bold" formatter={(v: number) => `${v.toFixed(1)}%`} />
+                       {barData.map((entry, index) => (
+                         <Cell key={`cell-${index}`} fill={entry.value >= entry.threshold && entry.threshold > 0 ? '#f43f5e' : '#14b8a6'} />
+                       ))}
+                   </Bar>
+                   <Scatter dataKey="threshold" fill="#0ea5e9" shape="circle" isAnimationActive={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          <div className="card rounded-xl p-5 bg-[var(--surface)] border border-[var(--border)]">
+            <h4 className="text-[10px] font-bold uppercase text-[var(--text-muted)] mb-4">Escores Fecais (%)</h4>
+            <div className="h-[200px]">
+               <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" isAnimationActive={false}>
+                        {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                     </Pie>
+                     <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px', color: 'var(--text-main)' }} />
+                  </PieChart>
+               </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="flex flex-wrap gap-4 pt-4">
         {isReadOnly ? (

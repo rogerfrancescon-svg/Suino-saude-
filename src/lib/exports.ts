@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { VisitData } from '../types';
-import { formatDateBR, getIdealTempRange } from './utils';
+import { formatDateBR, getIdealTempRange, calculateHousingDays } from './utils';
 import { calculateVisitResults } from './scoring';
 import AppLogo from '../assets/images/regenerated_image_1781570211120.png';
 
@@ -79,14 +79,8 @@ export async function exportToPDF(records: VisitData[]) {
 
     let ageStr = '';
     if (d.housingDate && d.date) {
-      const [y1, m1, d1] = d.housingDate.split('-').map(Number);
-      const [y2, m2, d2] = d.date.split('-').map(Number);
-      if (y1 && y2) {
-        const time1 = Date.UTC(y1, m1 - 1, d1);
-        const time2 = Date.UTC(y2, m2 - 1, d2);
-        const elapsedDays = Math.max(0, Math.round((time2 - time1) / (1000 * 60 * 60 * 24)));
-        ageStr = `${elapsedDays} dias`;
-      }
+      const days = calculateHousingDays(d.housingDate, d.date);
+      if (days !== '?') ageStr = `${days} dias`;
     }
 
     const idBody = [
@@ -298,9 +292,8 @@ export function exportToExcel(records: VisitData[]) {
   const dashboardData = records.map(d => {
     let ageDays = 0;
     if (d.housingDate && d.date) {
-      const hd = new Date(d.housingDate + 'T00:00:00');
-      const vd = new Date(d.date + 'T00:00:00');
-      ageDays = Math.floor((vd.getTime() - hd.getTime()) / (1000 * 60 * 60 * 24));
+      const days = calculateHousingDays(d.housingDate, d.date);
+      if (typeof days === 'number') ageDays = days;
     }
 
     return {
@@ -354,14 +347,8 @@ export function exportToExcel(records: VisitData[]) {
   const orgData = records.map(d => {
     let ageStr = '';
     if (d.housingDate && d.date) {
-      const [y1, m1, d1] = d.housingDate.split('-').map(Number);
-      const [y2, m2, d2] = d.date.split('-').map(Number);
-      if (y1 && y2) {
-        const time1 = Date.UTC(y1, m1 - 1, d1);
-        const time2 = Date.UTC(y2, m2 - 1, d2);
-        const elapsedDays = Math.max(0, Math.round((time2 - time1) / (1000 * 60 * 60 * 24)));
-        ageStr = `${elapsedDays}`;
-      }
+      const days = calculateHousingDays(d.housingDate, d.date);
+      if (typeof days === 'number') ageStr = String(days);
     }
     return {
       Data: formatDateBR(d.date),
@@ -457,14 +444,8 @@ export function exportToWhatsApp(records: VisitData[]) {
 
     let ageStr = '';
     if (d.housingDate && d.date) {
-      const [y1, m1, d1] = d.housingDate.split('-').map(Number);
-      const [y2, m2, d2] = d.date.split('-').map(Number);
-      if (y1 && y2) {
-        const time1 = Date.UTC(y1, m1 - 1, d1);
-        const time2 = Date.UTC(y2, m2 - 1, d2);
-        const elapsedDays = Math.max(0, Math.round((time2 - time1) / (1000 * 60 * 60 * 24)));
-        ageStr = `${elapsedDays}`;
-      }
+      const days = calculateHousingDays(d.housingDate, d.date);
+      if (typeof days === 'number') ageStr = String(days);
     }
 
     if (d.batch && d.batch.trim() !== '') msg += `📦 *Lote:* ${d.batch}\n`;
@@ -603,4 +584,123 @@ export function importBackupFromExcel(file: File): Promise<VisitData[]> {
     reader.onerror = (err) => reject(err);
     reader.readAsBinaryString(file);
   });
+}
+
+export async function generateCompiledReportPDFBlob(records: VisitData[]): Promise<string> {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const margin = 14;
+
+  const img = new window.Image();
+  img.src = AppLogo;
+  await new Promise((resolve) => {
+    img.onload = resolve;
+    img.onerror = resolve;
+  });
+
+  const headerHeight = 36;
+  try {
+    doc.addImage(img, 'PNG', 0, 0, W, headerHeight);
+    doc.setFillColor(15, 23, 42); // match dark theme
+    doc.setGState(new (doc.GState as any)({ opacity: 0.85 }));
+    doc.rect(0, 0, W, headerHeight, 'F');
+    doc.setGState(new (doc.GState as any)({ opacity: 1.0 }));
+  } catch {
+    doc.setFillColor(15, 23, 42);
+    doc.rect(0, 0, W, headerHeight, 'F');
+  }
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SUINO SAÚDE', margin, 18);
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('RELATÓRIO DESCRITIVO COMPILADO', margin, 24);
+
+  const dateStr = new Date().toLocaleDateString('pt-BR');
+  doc.text(`Data de Geração: ${dateStr}`, margin, 30);
+  doc.text(`${records.length} Lotes Selecionados`, W - margin, 30, { align: 'right' });
+
+  doc.setTextColor(15, 23, 42);
+  let y = headerHeight + 10;
+
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    
+    if (y > H - 50 && i > 0) {
+      doc.addPage();
+      y = 20;
+    }
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${i + 1}. Cliente: ${record.producer} - Produtor: ${record.farm}`, margin, y);
+    y += 5;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Lote: ${record.batch || 'N/I'} | Data: ${formatDateBR(record.date)} | Fase: ${record.phase || 'N/I'}`, margin, y);
+    y += 7;
+
+    const score = record.results?.score || calculateVisitResults(record).score;
+    const status = record.results?.scoreStatus || calculateVisitResults(record).scoreStatus;
+    
+    // AutoTable for summary details
+    let ageStr = '';
+    if (record.housingDate && record.date) {
+      const days = calculateHousingDays(record.housingDate, record.date);
+      if (days !== '?') ageStr = `${days} dias`;
+    }
+
+    const idBody = [
+      ['Idade do Lote', ageStr || 'Não informada', 'Efetivo', `${record.totalAnimals} animais`],
+      ['Ração Atual', record.feed || 'Não informada', 'Mortalidade', `${record.results?.mortalityRate.toFixed(1) || 0}%`],
+      ['Sint. Respiratórios', `Tosses: ${record.results?.cFreq.toFixed(1) || 0}% | Espirros: ${record.results?.sFreq.toFixed(1) || 0}%`, 'Sint. Entéricos', `Diarreia: ${record.results?.liqFreq.toFixed(1) || 0}%`],
+      ['Ambiência', `Temp: ${record.temp ? record.temp + '°C' : 'N/I'} | Umid: ${record.humidity ? record.humidity + '%' : 'N/I'} | CO2: ${record.co2 ? record.co2 + 'ppm' : 'N/I'}`, 'Score Global', `${score}/100 (${status})`]
+    ];
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      headStyles: { fillColor: [245, 245, 245], textColor: [40, 40, 40], fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [50, 50, 50] },
+      columnStyles: { 0: { cellWidth: 35, fontStyle: 'bold' }, 2: { cellWidth: 35, fontStyle: 'bold' } },
+      body: idBody
+    });
+
+    y = doc.lastAutoTable.finalY + 8;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Observações / Notas do Lote:', margin, y);
+    y += 5;
+    
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(80, 80, 80);
+    const observationText = record.notes && record.notes.trim() ? record.notes.trim() : "Nenhuma observação registrada para este lote.";
+    
+    const splitNotes = doc.splitTextToSize(observationText, W - (margin * 2));
+    
+    if (y + (splitNotes.length * 4) > H - 15) {
+       doc.addPage();
+       y = 20;
+    }
+    
+    doc.text(splitNotes, margin, y);
+    y += (splitNotes.length * 4) + 8;
+    doc.setTextColor(15, 23, 42);
+    
+    if (i < records.length - 1) {
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y - 4, W - margin, y - 4);
+      y += 6;
+    }
+  }
+
+  return URL.createObjectURL(doc.output('blob'));
 }

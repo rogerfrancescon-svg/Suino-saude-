@@ -8,7 +8,26 @@ export function cn(...inputs: ClassValue[]) {
 export function formatDateBR(dateStr: string) {
   if (!dateStr) return new Date().toLocaleDateString('pt-BR');
   const p = dateStr.split('-');
-  return p.length === 3 ? `${p[2]}/${[p[1]]}/${p[0]}` : dateStr;
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : dateStr;
+}
+
+export function calculateHousingDays(housingDateStr?: string, visitDateStr?: string): number | '?' {
+  if (!housingDateStr || !visitDateStr) return '?';
+  try {
+    const parseDate = (dStr: string) => {
+      const parts = dStr.split('T')[0].split('-');
+      if (parts.length < 3) throw new Error('Invalid');
+      const [y, m, d] = parts;
+      return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+    };
+    const hd = parseDate(housingDateStr);
+    const vd = parseDate(visitDateStr);
+    if (isNaN(hd.getTime()) || isNaN(vd.getTime())) return '?';
+    const diffTime = vd.getTime() - hd.getTime();
+    return Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+  } catch(e) {
+    return '?';
+  }
 }
 
 export function parseDateFlexible(dateStr: string | undefined): Date {

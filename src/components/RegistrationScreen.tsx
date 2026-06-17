@@ -1,6 +1,7 @@
 import React from 'react';
 import { VisitData, Phase, Duration } from '../types';
 import { cn } from '../lib/utils';
+import { calculateHousingDays } from '../lib/utils';
 
 interface Props {
   data: Partial<VisitData>;
@@ -71,7 +72,42 @@ export default function RegistrationScreen({ data, onChange, onNext }: Props) {
             <input 
               className="field-input w-full rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-brand-primary/20"
               value={data.farm || ''}
-              onChange={e => onChange('farm', e.target.value)}
+              onChange={e => {
+                const newFarm = e.target.value;
+                onChange('farm', newFarm);
+                if (data.producer === 'Pastre' || data.producer?.toLowerCase() === 'pastre') {
+                  const housingDateFixes: Record<string, string> = {
+                    "Luiz Forchezatto": "2026-04-07",
+                    "Jarlei Toniello": "2026-02-10",
+                    "Eladio Cumerlato": "2026-03-11",
+                    "Laudir Galante": "2026-04-14",
+                    "Violar Ferrari": "2026-03-30",
+                    "Tanamara Kirst": "2026-05-04",
+                    "Jones Gemi": "2026-04-07",
+                    "Wanderlei Richit": "2026-03-23",
+                    "Delcio Renosto": "2026-03-27",
+                    "Delcio Renostro": "2026-03-27",
+                    "Roni José Zanela": "2026-05-05",
+                    "Gilmar Miglioretto": "2026-05-28",
+                    "Altivo Dani": "2026-04-21",
+                    "Valdecir Forchezato": "2026-03-02",
+                    "Valdecir Forchezatto": "2026-03-02",
+                    "José Trojan": "2026-05-11",
+                    "Jose Trojan": "2026-05-11",
+                    "Jose trojan": "2026-05-11",
+                    "José Trojan Neto": "2026-05-11",
+                    "Gilar Zanella": "2026-05-05"
+                  };
+                  let mappedDate = housingDateFixes[newFarm];
+                  if (!mappedDate) {
+                    const match = Object.entries(housingDateFixes).find(([k]) => k.toLowerCase() === newFarm.toLowerCase());
+                    if (match) mappedDate = match[1];
+                  }
+                  if (mappedDate) {
+                    onChange('housingDate', mappedDate);
+                  }
+                }
+              }}
               placeholder="Ex: Produtor A"
               list="produtores-list"
             />
@@ -105,7 +141,7 @@ export default function RegistrationScreen({ data, onChange, onNext }: Props) {
               />
               {(data.housingDate && data.date) && (
                 <div className="flex items-center justify-center px-4 bg-brand-primary/10 text-brand-primary font-bold text-sm rounded-lg border border-brand-primary/20 whitespace-nowrap" title="Idade do lote em dias">
-                  {Math.max(0, Math.floor((new Date(data.date).getTime() - new Date(data.housingDate).getTime()) / (1000 * 60 * 60 * 24)))} dias
+                  {calculateHousingDays(data.housingDate, data.date)} dias
                 </div>
               )}
             </div>
