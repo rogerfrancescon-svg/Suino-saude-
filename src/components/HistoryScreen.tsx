@@ -240,10 +240,10 @@ export default function HistoryScreen({ history, setHistory, onDeleteSelected, o
           <div className="mb-4">
             <button 
               onClick={handlePreviewCompiledReport}
-              className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black uppercase rounded-xl transition-all shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-brand-primary hover:bg-brand-primary-light text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
             >
-              <FileText size={20} /> 
-              Gerar Relatório Descritivo Completo (Layout Centralizado)
+              <FileText size={16} /> 
+              Relatório Descritivo
             </button>
           </div>
 
