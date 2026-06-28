@@ -7,7 +7,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   // In GitHub Actions, VITE_BASE_PATH is passed directly from steps.pages.outputs.base_path.
-  let baseFromEnv = process.env.VITE_BASE_PATH !== undefined ? process.env.VITE_BASE_PATH : (mode === 'production' ? '/Suino-saude-/' : '/');
+  let baseFromEnv = process.env.VITE_BASE_PATH !== undefined ? process.env.VITE_BASE_PATH : '/';
   if (baseFromEnv && !baseFromEnv.startsWith('/')) baseFromEnv = '/' + baseFromEnv;
   const repoBase = baseFromEnv ? `${baseFromEnv}/`.replace(/\/\/+/g, '/') : '/';
   
@@ -90,7 +90,8 @@ export default defineConfig(({mode}) => {
           ]
         },
         devOptions: {
-          enabled: false
+          enabled: true,
+          type: 'module'
         }
       })
     ],

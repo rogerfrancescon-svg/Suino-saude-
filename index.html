@@ -15,21 +15,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      if ('serviceWorker' in navigator && (window.location.hostname === 'localhost' || window.location.hostname.includes('dev') || window.location.hostname.includes('run.app'))) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          let hasUnregistered = false;
-          for(let registration of registrations) {
-            registration.unregister();
-            hasUnregistered = true;
-          }
-          if (hasUnregistered) {
-            console.log('ServiceWorker unregistered, reloading to clear PWA cache');
-            window.location.reload();
-          }
-        });
-      }
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

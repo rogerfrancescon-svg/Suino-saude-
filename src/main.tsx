@@ -7,18 +7,9 @@ import './index.css';
 
 // Registra o Service Worker do PWA
 if ('serviceWorker' in navigator) {
-  if (import.meta.env.PROD) {
-    import('virtual:pwa-register').then(({ registerSW }) => {
-      registerSW({ immediate: true });
-    }).catch(() => {});
-  } else {
-    // Unregister in dev to prevent caching issues
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      for (const registration of registrations) {
-        registration.unregister();
-      }
-    });
-  }
+  import('virtual:pwa-register').then(({ registerSW }) => {
+    registerSW({ immediate: true });
+  }).catch(() => {});
 }
 
 createRoot(document.getElementById('root')!).render(
