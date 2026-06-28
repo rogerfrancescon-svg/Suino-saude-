@@ -3,7 +3,7 @@ import { VisitData } from '../types';
 import { calculateVisitResults } from '../lib/scoring';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Users, AlertTriangle, Activity, Wind, Beaker, ChevronDown, Sparkles, Filter, ShieldCheck, Thermometer, X, Download } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, abbreviateName } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { toPng } from 'html-to-image';
 
@@ -606,8 +606,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                       )}>{p.rank}</span>
                     </td>
                     <td className="py-3 px-3 truncate max-w-[120px]">
-                      <div className="font-bold text-slate-200">{p.producer}</div>
-                      <div className="text-[11px] text-slate-500 font-normal">{p.farm}</div>
+                      <div className="font-bold text-slate-200">{abbreviateName(p.producer)}</div>
+                      <div className="text-[11px] text-slate-500 font-normal">{abbreviateName(p.farm)}</div>
                     </td>
                     <td className="py-3 px-3">
                       <span className={cn(
@@ -618,14 +618,38 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                     </td>
                     <td className="py-3 px-3 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <svg className="w-8 h-4 sparkline" viewBox="0 0 30 10">
-                          {p.trend >= 0 ? (
-                            <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
-                          ) : (
-                            <path d="M0,0 Q10,2 15,6 T30,10" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
-                          )}
-                        </svg>
-                        <span className={cn("text-xs font-mono font-bold w-8", p.trend >= 0 ? "text-green-500" : "text-red-500")}>
+                        <div className="w-12 h-6">
+                          {(() => {
+                             const producerHistory = history.filter(h => h.producer === p.producer && h.farm === p.farm).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                             const miniData = producerHistory.map(h => ({ score: h.results.score }));
+                             if (miniData.length < 2) {
+                                return (
+                                  <svg className="w-full h-4 sparkline" viewBox="0 0 30 10">
+                                    {p.trend >= 0 ? (
+                                      <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
+                                    ) : (
+                                      <path d="M0,0 Q10,2 15,6 T30,10" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+                                    )}
+                                  </svg>
+                                );
+                             }
+                             const strokeColor = p.trend >= 0 ? "#22C55E" : "#EF4444";
+                             return (
+                               <ResponsiveContainer width="100%" height="100%">
+                                 <AreaChart data={miniData}>
+                                   <defs>
+                                     <linearGradient id={`color-rank-${p.id}`} x1="0" y1="0" x2="0" y2="1">
+                                       <stop offset="5%" stopColor={strokeColor} stopOpacity={0.3}/>
+                                       <stop offset="95%" stopColor={strokeColor} stopOpacity={0}/>
+                                     </linearGradient>
+                                   </defs>
+                                   <Area type="monotone" dataKey="score" stroke={strokeColor} strokeWidth={2} fillOpacity={1} fill={`url(#color-rank-${p.id})`} />
+                                 </AreaChart>
+                               </ResponsiveContainer>
+                             );
+                          })()}
+                        </div>
+                        <span className={cn("text-xs font-mono font-bold w-6", p.trend >= 0 ? "text-green-500" : "text-red-500")}>
                           {p.trend >= 0 ? '↑' : '↓'}{Math.abs(p.trend)}
                         </span>
                       </div>
@@ -726,8 +750,8 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                       )}
                     >
                       <td className="py-4 px-4 text-slate-200">
-                        <div className="font-bold">{p.producer}</div>
-                        <div className="text-[11px] font-normal text-slate-500">{p.farm}</div>
+                        <div className="font-bold">{abbreviateName(p.producer)}</div>
+                        <div className="text-[11px] font-normal text-slate-500">{abbreviateName(p.farm)}</div>
                       </td>
                       <td className="py-4 px-4">
                         <span className={cn(
@@ -761,14 +785,37 @@ export default function DashboardScreen({ history, onViewProducer, onViewAllAler
                         </span>
                       </td>
                       <td className="py-4 px-4 flex justify-center">
-                        <div className="w-8 flex items-center h-full">
-                          <svg className="w-full h-4 sparkline" viewBox="0 0 30 10">
-                            {p.trend >= 0 ? (
-                              <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
-                            ) : (
-                              <path d="M0,0 Q10,2 15,6 T30,10" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
-                            )}
-                          </svg>
+                        <div className="w-16 h-8">
+                          {(() => {
+                             const producerHistory = history.filter(h => h.producer === p.producer && h.farm === p.farm).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                             const miniData = producerHistory.map(h => ({ score: h.results.score }));
+                             if (miniData.length < 2) {
+                                // Fallback to basic visual if no history
+                                return (
+                                  <svg className="w-full h-4 sparkline" viewBox="0 0 30 10">
+                                    {p.trend >= 0 ? (
+                                      <path d="M0,8 Q10,8 15,4 T30,0" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round"/>
+                                    ) : (
+                                      <path d="M0,0 Q10,2 15,6 T30,10" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+                                    )}
+                                  </svg>
+                                );
+                             }
+                             const strokeColor = p.trend >= 0 ? "#22C55E" : "#EF4444";
+                             return (
+                               <ResponsiveContainer width="100%" height="100%">
+                                 <AreaChart data={miniData}>
+                                   <defs>
+                                     <linearGradient id={`color-${p.id}`} x1="0" y1="0" x2="0" y2="1">
+                                       <stop offset="5%" stopColor={strokeColor} stopOpacity={0.3}/>
+                                       <stop offset="95%" stopColor={strokeColor} stopOpacity={0}/>
+                                     </linearGradient>
+                                   </defs>
+                                   <Area type="monotone" dataKey="score" stroke={strokeColor} fillOpacity={1} fill={`url(#color-${p.id})`} />
+                                 </AreaChart>
+                               </ResponsiveContainer>
+                             );
+                          })()}
                         </div>
                       </td>
                       <td className="py-4 px-4 text-center">

@@ -301,7 +301,7 @@ Iniciou tratamento com trimetox`
     co2: '836',
     duration: 'Insignificante (< 24h)',
     counts: { cough: 56, sneeze: 55, e2: 0, e3: 0 },
-    notes: `Animais comeco barracão de baixo comendo inicial`
+    notes: `Os animais localizados na porção inicial do barracão inferior estão consumindo a ração inicial.Durante o período de consumo da ração inicial, observa-se um desafio respiratório aumentado.Sugerido realizar tratamento do lote`
   },
   {
     id: 1716940800015,
@@ -319,11 +319,7 @@ Iniciou tratamento com trimetox`
     co2: '710',
     duration: 'Insignificante (< 24h)',
     counts: { cough: 37, sneeze: 21, e2: 0, e3: 0 },
-    notes: `Cochos com regulagens mais aberta 
-Pele mais quebradiço e menor
-22 ton barracão 1
-22 ton barracão 2
-Próxima caraga terça`
+    notes: `Cochos com regulagens mais abertas.Pelete mais quebradiço e menor.22 ton. barracão 122 ton. barracão 2Próxima carga: terça.`
   },
   {
     id: 1716940800016,
@@ -341,9 +337,7 @@ Próxima caraga terça`
     co2: '640',
     duration: 'Insignificante (< 24h)',
     counts: { cough: 33, sneeze: 26, e2: 0, e3: 3 },
-    notes: `Alojado com 16,04 kg
-Quadros de encefalite no alojamento (amoxicilina via água 3º dia)
-14 ton silo`
+    notes: `Alojado com 16,04 kg/leitão.Quadros de encefalite no alojamento (amoxicilina via água, 3º dia) apresentando bom resultado.Volume de ração: 14 ton no silo.`
   },
   {
     id: 1716940800017,
@@ -361,9 +355,7 @@ Quadros de encefalite no alojamento (amoxicilina via água 3º dia)
     co2: '1200',
     duration: 'Insignificante (< 24h)',
     counts: { cough: 33, sneeze: 10, e2: 0, e3: 0 },
-    notes: `Sintomas de app nos 2 barracões de cima
-Será tratado com tilmicosina 
-14 ton de ração`
+    notes: `Sintomas de APP nos dois barracões de cima.Será tratado com tilmicosina.Ração no silo: 14 toneladas de ração.`
   }
 ];
 

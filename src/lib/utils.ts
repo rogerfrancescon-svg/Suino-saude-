@@ -35,6 +35,13 @@ export function parseDateFlexible(dateStr: string | undefined): Date {
   return new Date(dateStr + 'T00:00:00');
 }
 
+export function abbreviateName(name: string | undefined): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 10) + (parts[0].length > 10 ? '.' : '');
+  return `${parts[0].substring(0, 8)} ${parts[parts.length - 1].charAt(0)}.`;
+}
+
 export function getIdealTempRange(phase: string, visitDateStr?: string, housingDateStr?: string): { min: number, max: number, label: string } {
   let minTemp = 18;
   let maxTemp = 28;

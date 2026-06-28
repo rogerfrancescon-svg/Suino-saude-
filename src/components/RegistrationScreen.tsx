@@ -131,7 +131,7 @@ export default function RegistrationScreen({ data, onChange, onNext }: Props) {
               onChange={e => onChange('date', e.target.value)}
             />
           </Field>
-          <Field label="Data de Alojamento" required>
+          <Field label="Data de Alojamento">
             <div className="flex gap-2">
               <input 
                 type="date"
@@ -250,7 +250,7 @@ export default function RegistrationScreen({ data, onChange, onNext }: Props) {
       <div className="pt-4">
         <button 
           onClick={onNext}
-          disabled={!data.producer || !data.farm || !data.phase || !data.totalAnimals || !data.housingDate || !data.date}
+          disabled={!data.producer || !data.farm || !data.phase || !data.totalAnimals || !data.date}
           className="w-full md:w-auto px-10 py-3 bg-brand-primary hover:bg-brand-primary-light disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-white font-bold rounded-lg"
         >
           Próximo: Ambiência →

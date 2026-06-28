@@ -9,12 +9,12 @@ import {
   ArrowUpRight, ArrowDownRight, Wind, Droplets, Calendar,
   ChevronRight, RefreshCcw, Check, ChevronDown, X, CheckCircle, AlertTriangle
 } from 'lucide-react';
-import { cn } from '../lib/utils';
-import { calculateHousingDays } from '../lib/utils';
+import { cn, calculateHousingDays, abbreviateName } from '../lib/utils';
 
 interface Props {
   history: VisitData[];
   onViewDetails: (visit: VisitData) => void;
+  onEdit: (visit: VisitData) => void;
 }
 
 type MetricType = 'score' | 'cough' | 'sneeze' | 'enteric' | 'mortality';
@@ -153,7 +153,7 @@ function MultiSelect({ label, icon: Icon, options, selected, onChange, placehold
   );
 }
 
-export default function AnalysisScreen({ history, onViewDetails }: Props) {
+export default function AnalysisScreen({ history, onViewDetails, onEdit }: Props) {
   const [selectedProducers, setSelectedProducers] = useState<string[]>(() => {
     const saved = sessionStorage.getItem('analysis_producers');
     return saved ? JSON.parse(saved) : [];
@@ -316,25 +316,40 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
     return base.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [history, selectedProducers, selectedFarms, selectedBatches, selectedPhases, selectedDates, timeRange]);
 
-  const itemsInView = Array.from(new Set(filteredHistory.map(h => `${h.producer} (${h.farm})${h.batch ? ` - ${h.batch}` : ''}`))) as string[];
+  const itemsInView = Array.from(new Set(filteredHistory.map(h => `${h.producer} (${h.farm})`))) as string[];
   const dates = Array.from(new Set(filteredHistory.map(h => h.date))).sort();
   
   const itemsInflections = useMemo(() => {
     const inflections: Record<string, string[]> = {};
     itemsInView.forEach(item => {
       inflections[item] = [];
-      const itemVisits = filteredHistory.filter(h => `${h.producer} (${h.farm})${h.batch ? ` - ${h.batch}` : ''}` === item).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      const itemVisits = filteredHistory.filter(h => `${h.producer} (${h.farm})` === item).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       
-      for (let i = 1; i < itemVisits.length; i++) {
-        const prev = itemVisits[i - 1];
-        const curr = itemVisits[i];
+      // We might have multiple visits on the same date, so let's group them by date
+      const datesForItems = Array.from(new Set(itemVisits.map(v => v.date)));
+      const aggregatedVisits = datesForItems.map((d: string) => {
+        const dayVisits = itemVisits.filter(v => v.date === d);
+        // average out the scores
+        return {
+          date: d,
+          score: dayVisits.reduce((acc, v) => acc + v.results.score, 0) / dayVisits.length,
+          cFreq: dayVisits.reduce((acc, v) => acc + v.results.cFreq, 0) / dayVisits.length,
+          sFreq: dayVisits.reduce((acc, v) => acc + v.results.sFreq, 0) / dayVisits.length,
+          liqFreq: dayVisits.reduce((acc, v) => acc + v.results.liqFreq, 0) / dayVisits.length,
+          mortalityRate: dayVisits.reduce((acc, v) => acc + v.results.mortalityRate, 0) / dayVisits.length,
+        };
+      });
+
+      for (let i = 1; i < aggregatedVisits.length; i++) {
+        const prev = aggregatedVisits[i - 1];
+        const curr = aggregatedVisits[i];
         
         let valPrev = 0, valCurr = 0;
-        if (selectedMetric === 'score') { valPrev = prev.results.score; valCurr = curr.results.score; }
-        else if (selectedMetric === 'cough') { valPrev = prev.results.cFreq; valCurr = curr.results.cFreq; }
-        else if (selectedMetric === 'sneeze') { valPrev = prev.results.sFreq; valCurr = curr.results.sFreq; }
-        else if (selectedMetric === 'enteric') { valPrev = prev.results.liqFreq; valCurr = curr.results.liqFreq; }
-        else if (selectedMetric === 'mortality') { valPrev = prev.results.mortalityRate; valCurr = curr.results.mortalityRate; }
+        if (selectedMetric === 'score') { valPrev = prev.score; valCurr = curr.score; }
+        else if (selectedMetric === 'cough') { valPrev = prev.cFreq; valCurr = curr.cFreq; }
+        else if (selectedMetric === 'sneeze') { valPrev = prev.sFreq; valCurr = curr.sFreq; }
+        else if (selectedMetric === 'enteric') { valPrev = prev.liqFreq; valCurr = curr.liqFreq; }
+        else if (selectedMetric === 'mortality') { valPrev = prev.mortalityRate; valCurr = curr.mortalityRate; }
         
         // Define inflection: significant drop in score or spike in problems
         const isInflection = (selectedMetric === 'score') 
@@ -352,15 +367,25 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
   const chartData = dates.map(date => {
     const entry: any = { date };
     itemsInView.forEach(item => {
-      const visit = filteredHistory.find(h => h.date === date && `${h.producer} (${h.farm})${h.batch ? ` - ${h.batch}` : ''}` === item);
-      if (visit) {
+      const visitsOnDate = filteredHistory.filter(h => h.date === date && `${h.producer} (${h.farm})` === item);
+      if (visitsOnDate.length > 0) {
         const key = item;
-        if (selectedMetric === 'score') entry[key] = visit.results.score;
-        else if (selectedMetric === 'cough') entry[key] = visit.results.cFreq;
-        else if (selectedMetric === 'sneeze') entry[key] = visit.results.sFreq;
-        else if (selectedMetric === 'enteric') entry[key] = visit.results.liqFreq;
-        else if (selectedMetric === 'mortality') entry[key] = visit.results.mortalityRate;
-        entry[`${key}_visit`] = visit; 
+        const avgScore = visitsOnDate.reduce((acc, v) => acc + v.results.score, 0) / visitsOnDate.length;
+        const avgCough = visitsOnDate.reduce((acc, v) => acc + v.results.cFreq, 0) / visitsOnDate.length;
+        const avgSneeze = visitsOnDate.reduce((acc, v) => acc + v.results.sFreq, 0) / visitsOnDate.length;
+        const avgEnteric = visitsOnDate.reduce((acc, v) => acc + v.results.liqFreq, 0) / visitsOnDate.length;
+        const avgMort = visitsOnDate.reduce((acc, v) => acc + v.results.mortalityRate, 0) / visitsOnDate.length;
+        
+        // Average the metrics if there are multiple matches
+        if (selectedMetric === 'score') entry[key] = avgScore;
+        else if (selectedMetric === 'cough') entry[key] = avgCough;
+        else if (selectedMetric === 'sneeze') entry[key] = avgSneeze;
+        else if (selectedMetric === 'enteric') entry[key] = avgEnteric;
+        else if (selectedMetric === 'mortality') entry[key] = avgMort;
+        
+        // Save the first visit for tooltip context
+        entry[`${key}_visit`] = visitsOnDate[0];
+        entry[`${key}_avgs`] = { score: avgScore, cFreq: avgCough, sFreq: avgSneeze, liqFreq: avgEnteric };
         entry[`${key}_isInflection`] = itemsInflections[item].includes(date);
       }
     });
@@ -374,6 +399,7 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
           <p className="font-bold border-b border-[var(--border)] pb-2 mb-2 text-[var(--text-main)]">{label.split('-').reverse().slice(0, 2).join('/')}</p>
           {payload.map((entry: any, index: number) => {
             const visit: VisitData = entry.payload[`${entry.dataKey}_visit`];
+            const avgs = entry.payload[`${entry.dataKey}_avgs`] || visit.results;
             const isInflection = entry.payload[`${entry.dataKey}_isInflection`];
             if (!visit) return null;
             return (
@@ -383,13 +409,11 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                   {entry.name}
                 </div>
                 <div className="pl-4 space-y-1 text-[10px] text-[var(--text-muted)]">
-                  <p><span className="font-semibold text-[var(--text-main)]">Fase:</span> {visit.phase}{visit.batch ? ` / Lote: ${visit.batch}` : ''}</p>
-                  <p><span className="font-semibold text-[var(--text-main)]">Produtor:</span> {visit.farm}</p>
                   <div className="grid grid-cols-2 gap-1 mt-1 bg-[var(--bg)] p-1.5 rounded">
-                    <p>Score: <span className="font-mono text-[var(--text-main)] font-bold">{visit.results.score.toFixed(0)}</span></p>
-                    <p>Tosse: <span className="font-mono text-brand-warn font-bold">{visit.results.cFreq.toFixed(1)}%</span></p>
-                    <p>Espirro: <span className="font-mono text-brand-danger font-bold">{visit.results.sFreq.toFixed(1)}%</span></p>
-                    <p>Entérico: <span className="font-mono text-brand-warn font-bold">{visit.results.liqFreq.toFixed(1)}%</span></p>
+                    <p>Score: <span className="font-mono text-[var(--text-main)] font-bold">{avgs.score.toFixed(0)}</span></p>
+                    <p>Tosse: <span className="font-mono text-brand-warn font-bold">{avgs.cFreq.toFixed(1)}%</span></p>
+                    <p>Espirro: <span className="font-mono text-brand-danger font-bold">{avgs.sFreq.toFixed(1)}%</span></p>
+                    <p>Entérico: <span className="font-mono text-brand-warn font-bold">{avgs.liqFreq.toFixed(1)}%</span></p>
                   </div>
                   {isInflection && (
                     <div className="mt-1 bg-brand-danger/10 border border-brand-danger/20 text-brand-danger p-1 rounded font-bold text-[9px] uppercase tracking-wider flex items-center gap-1">
@@ -487,12 +511,13 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
     if (isInflection) {
       return (
         <g>
-          <circle cx={cx} cy={cy} r={6} fill="var(--surface)" stroke="#ef4444" strokeWidth={3} />
+          <circle cx={cx} cy={cy} r={5} fill="var(--surface)" stroke="#ef4444" strokeWidth={2} />
           <circle cx={cx} cy={cy} r={2} fill="#ef4444" />
         </g>
       );
     }
-    return <circle cx={cx} cy={cy} r={4} fill="var(--surface)" stroke={stroke} strokeWidth={2} />;
+    // Make normal dots very small and subtle so they don't pollute the view
+    return <circle cx={cx} cy={cy} r={2} fill={stroke} stroke="var(--surface)" strokeWidth={0.5} opacity={0.6}/>;
   };
 
   const CustomActiveDot = (props: any) => {
@@ -500,10 +525,10 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
     const isInflection = payload[`${dataKey}_isInflection`];
     if (isInflection) {
       return (
-         <circle cx={cx} cy={cy} r={8} fill="#ef4444" stroke="var(--surface)" strokeWidth={2} />
+         <circle cx={cx} cy={cy} r={7} fill="#ef4444" stroke="var(--surface)" strokeWidth={2} />
       );
     }
-    return <circle cx={cx} cy={cy} r={7} fill={stroke} stroke="var(--surface)" strokeWidth={2} />;
+    return <circle cx={cx} cy={cy} r={5} fill={stroke} stroke="var(--surface)" strokeWidth={1.5} />;
   };
 
   return (
@@ -666,6 +691,77 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
         )}
       </div>
 
+      {/* Chart Section */}
+      {filteredHistory.length > 0 && chartData.length > 0 && (
+        <div className="bg-gradient-to-br from-[var(--surface)] to-[var(--surface-color)] p-6 rounded-3xl w-full border border-[var(--border)] shadow-xl relative overflow-hidden">
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-brand-primary/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div>
+              <h3 className="text-lg font-black text-[var(--text-main)] flex items-center gap-2">
+                <TrendingUp size={20} className="text-brand-primary" /> Evolução Consolidada
+              </h3>
+              <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider mt-1">Comparativo de Desempenho no Tempo</p>
+            </div>
+          </div>
+          
+          <div className="h-[380px] w-full relative z-10">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                <defs>
+                  {itemsInView.map((item, index) => (
+                    <linearGradient key={`color-${index}`} id={`color-${index}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={colors[index % colors.length]} stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor={colors[index % colors.length]} stopOpacity={0}/>
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.6} />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(val) => val.split('-').reverse().slice(0, 2).join('/')}
+                  tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={15}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: 'var(--text-muted)', fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={selectedMetric === 'score' ? [0, 100] : ['auto', 'auto']}
+                  dx={-15}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border)', strokeWidth: 2, strokeDasharray: '4 4' }} />
+                
+                {selectedMetric === 'score' && <ReferenceLine y={70} stroke="#f43f5e" strokeDasharray="5 5" opacity={0.6} />}
+                {selectedMetric === 'score' && <ReferenceLine y={85} stroke="#10b981" strokeDasharray="5 5" opacity={0.6} />}
+                
+                {itemsInView.map((item, index) => {
+                  const [producer, ...farmParts] = item.split(' (');
+                  const farm = farmParts.join(' (').replace(/\)$/, '');
+                  const abbreviatedName = `${abbreviateName(producer)} (${abbreviateName(farm)})`;
+                  return (
+                  <Line 
+                    key={item}
+                    name={abbreviatedName}
+                    type="monotone" 
+                    dataKey={item} 
+                    stroke={colors[index % colors.length]} 
+                    strokeWidth={3}
+                    dot={{ r: 4, strokeWidth: 2, fill: 'var(--surface)' }}
+                    activeDot={{ r: 6, strokeWidth: 0, fill: colors[index % colors.length] }}
+                    connectNulls={true}
+                    animationDuration={1500}
+                    animationEasing="ease-out"
+                  />
+                )})}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       {/* Enhanced Batch Grid or Table View */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -688,7 +784,7 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                       </span>
                       <span className="text-[var(--border)] text-[8px]">|</span>
                       <span className="flex items-center gap-1 text-[9px] text-[var(--text-muted)] font-bold">
-                         <Clock size={10} /> {calculateHousingDays(latest.housingDate, latest.date)}d
+                         <Clock size={10} /> {latest.housingDate ? `${calculateHousingDays(latest.housingDate, latest.date)}d` : 'Idade N/A'}
                       </span>
                     </div>
                     <div className="mt-1.5 space-y-0.5">
@@ -725,7 +821,7 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                   )}
                 </div>
 
-                <div className="mt-5 pt-5 border-t border-[var(--border)] border-dashed grid grid-cols-4 gap-2 relative z-10">
+                <div className="mt-5 pt-5 border-t border-[var(--border)] border-dashed grid grid-cols-2 sm:grid-cols-4 gap-2 relative z-10">
                   <div className="bg-[var(--bg)]/50 p-2 rounded-xl text-center">
                     <p className="text-[8px] text-[var(--text-muted)] uppercase font-bold">Tosse</p>
                     <p className={cn("text-xs font-mono font-bold mt-0.5", latest.results.cFreq > 5 ? "text-brand-danger" : "text-[var(--text-main)]")}>
@@ -750,6 +846,21 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                       {latest.results.mortalityRate.toFixed(1)}%
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-[var(--border)] flex justify-end gap-3 relative z-10">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onViewDetails(latest); }}
+                    className="text-[10px] font-bold text-[var(--text-muted)] hover:text-brand-primary uppercase transition-colors"
+                  >
+                    Ver Detalhes
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit && onEdit(latest); }}
+                    className="text-[10px] font-bold text-[var(--text-muted)] hover:text-brand-primary uppercase transition-colors"
+                  >
+                    Editar
+                  </button>
                 </div>
               </div>
             );
@@ -781,7 +892,7 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-xs font-bold text-[var(--text-main)]">{latest.phase}</p>
-                        <p className="text-[10px] text-[var(--text-muted)]">{calculateHousingDays(latest.housingDate, latest.date)} dias de alojamento</p>
+                        <p className="text-[10px] text-[var(--text-muted)]">{latest.housingDate ? `${calculateHousingDays(latest.housingDate, latest.date)} dias de alojamento` : 'Data de alojamento N/A'}</p>
                         <div className="mt-1">
                           <p className="text-[9px] text-[var(--text-muted)]">Ração: <span className="font-semibold text-[var(--text-main)]">{latest.feed || 'Não informado'}</span></p>
                           <p className="text-[9px] text-[var(--text-muted)]">Medicam.: <span className="font-semibold text-[var(--text-main)]">{latest.meds || 'Não informado'}</span></p>
@@ -818,12 +929,20 @@ export default function AnalysisScreen({ history, onViewDetails }: Props) {
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button 
-                          onClick={() => onViewDetails(latest)}
-                          className="text-[10px] font-bold text-brand-primary hover:underline uppercase"
-                        >
-                          Ver Detalhes
-                        </button>
+                        <div className="flex flex-col items-end gap-2">
+                          <button 
+                            onClick={() => onViewDetails(latest)}
+                            className="text-[10px] font-bold text-brand-primary hover:underline uppercase"
+                          >
+                            Ver Detalhes
+                          </button>
+                          <button 
+                            onClick={() => onEdit && onEdit(latest)}
+                            className="text-[10px] font-bold text-[var(--text-muted)] hover:text-brand-primary hover:underline uppercase"
+                          >
+                            Editar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

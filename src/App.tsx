@@ -27,6 +27,10 @@ import PwaPrompt from './components/PwaPrompt';
 
 import { getSeededVisits } from './lib/seed';
 
+import { loginWithGoogle, logoutGoogle, useFirestoreSync } from './lib/sync';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { db } from './lib/firebase';
+
 const INITIAL_VISIT: Partial<VisitData> = {
   date: new Date().toISOString().split('T')[0],
   counts: { cough: 0, sneeze: 0, e2: 0, e3: 0 },
@@ -111,12 +115,11 @@ export default function App() {
       parsedHistory = parsedHistory.filter((h: any) => h.id < 1716940800000 || h.id > 1716940800017);
     }
 
-    // Auto-seed data if not present (expecting 18 seeded records)
-    const seededCount = parsedHistory.filter((h: any) => h.id >= 1716940800000 && h.id <= 1716940800017).length;
-    if (seededCount < 18) {
-      // Remove any previously seeded data and insert the complete dataset
+    // Add seed data if it doesn't exist
+    const hasAnySeeded = parsedHistory.some((h: any) => h.id >= 1716940800000 && h.id <= 1716940800017);
+    if (!hasAnySeeded) {
       parsedHistory = [
-        ...parsedHistory.filter((h: any) => h.id < 1716940800000 || h.id > 1716940800017), 
+        ...parsedHistory,
         ...getSeededVisits()
       ];
     }
@@ -167,6 +170,60 @@ export default function App() {
     return parsedHistory;
   });
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+
+  const { user, saveVisitToFirestore, deleteVisitsFromFirestore } = useFirestoreSync(history, setHistory);
+
+  const handleResetFromCloud = async () => {
+    if (!user) {
+      showToast("Você precisa estar conectado à nuvem para fazer isso.", "error");
+      return;
+    }
+    try {
+      showToast("Buscando dados da nuvem...", "success");
+      const querySnapshot = await getDocs(collection(db, `users/${user.uid}/history`));
+      const remoteData: VisitData[] = [];
+      querySnapshot.forEach((doc) => {
+        remoteData.push(doc.data() as VisitData);
+      });
+      
+      const seedIds = getSeededVisits().map(s => s.id);
+      
+      // Reset pending tag for seeded records but do not overwrite user edits
+      const correctedRemote = remoteData.map(v => {
+        return { ...v, isOfflinePending: false };
+      });
+
+      const sorted = correctedRemote.sort((a, b) => b.id - a.id);
+      setHistory(sorted);
+      showToast("Tabelas da nuvem baixadas e sincronizadas com sucesso!", "success");
+    } catch (error) {
+      console.error("Failed to reset from cloud", error);
+      showToast("Falha ao baixar dados da nuvem.", "error");
+    }
+  };
+
+  const handlePushToCloud = async () => {
+    if (!user) {
+      showToast("Você precisa estar conectado à nuvem para fazer isso.", "error");
+      return;
+    }
+    try {
+      showToast("Enviando dados locais para a nuvem...", "success");
+      const batchRequests = history.map(async (visit) => {
+        const docRef = doc(db, `users/${user.uid}/history`, visit.id.toString());
+        // Upload without the offline pending tag
+        const visitToUpload = { ...visit, isOfflinePending: false };
+        await setDoc(docRef, visitToUpload);
+      });
+      await Promise.all(batchRequests);
+      // Clear offline pending status locally
+      setHistory(prev => prev.map(v => ({ ...v, isOfflinePending: false })));
+      showToast("Todo o histórico local foi salvo na nuvem com sucesso!", "success");
+    } catch (error) {
+      console.error("Failed to push to cloud", error);
+      showToast("Falha ao enviar dados locais para a nuvem.", "error");
+    }
+  };
 
   // Persistence
   useEffect(() => {
@@ -241,15 +298,20 @@ export default function App() {
     const visitToSave: VisitData = {
       ...(currentVisit as VisitData),
       id: isEdit ? currentVisit.id! : Date.now(),
-      results
+      results,
+      isOfflinePending: true // Set to true initial state; cleared when successfully synced
     };
 
     if (isEdit) {
-      setHistory(prev => prev.map(h => h.id === visitToSave.id ? visitToSave : h));
+      setHistory(prev => prev.map(h => Number(h.id) === Number(visitToSave.id) ? visitToSave : h));
       showToast('Relatório atualizado com sucesso!');
     } else {
       setHistory(prev => [...prev, visitToSave]);
       showToast('Visita salva com sucesso!');
+    }
+    
+    if (user) {
+      saveVisitToFirestore(visitToSave);
     }
     
     setCurrentVisit(INITIAL_VISIT);
@@ -264,7 +326,17 @@ export default function App() {
 
   const deleteHistory = (ids: number[]) => {
     setHistory(prev => prev.filter(h => !ids.includes(h.id)));
+    if (user) {
+      deleteVisitsFromFirestore(ids);
+    }
     showToast('Registros removidos.');
+  };
+
+  const handleImportBackup = (merged: VisitData[]) => {
+    setHistory(merged);
+    if (user) {
+        merged.forEach(visit => saveVisitToFirestore(visit));
+    }
   };
 
   const results = calculateVisitResults(currentVisit);
@@ -365,6 +437,25 @@ export default function App() {
           </nav>
 
           <div className="p-5 border-t border-[var(--border)] pt-4 mt-auto">
+            {user ? (
+               <button 
+                  onClick={logoutGoogle}
+                  className="w-full flex items-center justify-between px-3 py-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-brand-success-light hover:bg-[var(--surface-hover)] transition-colors rounded-md border border-brand-success-light/20 bg-brand-success/10"
+               >
+                 <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-brand-success animate-pulse" /> Sincronizado
+                 </span>
+                 Sair
+               </button>
+            ) : (
+               <button 
+                  id="google-login-btn"
+                  onClick={loginWithGoogle}
+                  className="w-full flex items-center gap-3 px-3 py-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-brand-primary transition-colors bg-[var(--surface-hover)] rounded-md border border-[var(--border)]"
+               >
+                 Acessar Nuvem para Sincronizar
+               </button>
+            )}
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="w-full flex items-center gap-3 px-3 py-2 mb-4 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--accent-primary)] transition-colors bg-[var(--surface-hover)] rounded-md"
@@ -373,7 +464,7 @@ export default function App() {
               Alternar Tema
             </button>
             <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
-              Modo Offline Ativo ✓<br/>
+              {user ? 'Modo Online Ativo ✓' : 'Modo Offline Ativo ✓'}<br/>
               <span className="font-semibold text-[var(--text-muted)]">v2.4.0-stable</span>
             </p>
           </div>
@@ -382,6 +473,56 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 min-w-0 bg-[var(--bg)] flex flex-col overflow-hidden">
+        {/* Simple Top Bar with Active Screen Title or Sync Status */}
+        <header className="px-4 py-3 md:px-8 md:py-4 bg-[var(--surface)] border-b border-[var(--border)] flex items-center justify-between z-30">
+          <div className="flex items-center gap-3">
+            <span className="text-xl md:hidden">🛡️</span>
+            <div>
+              <h2 className="text-sm font-bold text-slate-100 md:hidden">Suino Saúde</h2>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wider hidden md:block">
+                {activeScreen === 0 && "Dashboard Geral"}
+                {activeScreen === 1 && "Entrada de Visita - Produtor"}
+                {activeScreen === 2 && "Entrada de Visita - Ambiência"}
+                {activeScreen === 3 && "Entrada de Visita - Tosse e Espirro"}
+                {activeScreen === 4 && "Resumo e Pontuação"}
+                {activeScreen === 5 && "Análise Estatística"}
+                {activeScreen === 8 && "Matriz de Organograma de Risco"}
+                {activeScreen === 6 && "Histórico de Registros"}
+                {activeScreen === 7 && "Visualizando Registro"}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 pr-12 md:pr-0">
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-brand-success animate-pulse" />
+                <span className="text-[10px] font-bold text-brand-success-light uppercase hidden sm:inline md:inline">
+                  Sincronizado: {user.email}
+                </span>
+                <button
+                  onClick={logoutGoogle}
+                  className="px-2 py-1 text-[9px] font-extrabold uppercase bg-brand-danger/10 text-brand-danger border border-brand-danger/25 hover:bg-brand-danger/20 transition-all rounded cursor-pointer"
+                >
+                  Sair
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-amber-500 uppercase hidden sm:inline md:inline mr-1">
+                  Modo Offline (Sem Sincronia)
+                </span>
+                <button 
+                  onClick={loginWithGoogle}
+                  className="px-2.5 py-1 text-[9px] font-extrabold uppercase bg-brand-primary text-black transition-all rounded shadow-md hover:bg-brand-primary-light cursor-pointer"
+                >
+                  Sincronizar no Celular
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
 
 
         <div className={cn("flex-1 overflow-y-auto", activeScreen === 0 ? "" : "p-4 md:p-8")}>
@@ -451,7 +592,7 @@ export default function App() {
                 />
               )}
               {activeScreen === 5 && (
-                <AnalysisScreen history={history} onViewDetails={handleViewVisitDetails} />
+                <AnalysisScreen history={history} onViewDetails={handleViewVisitDetails} onEdit={handleEditVisit} />
               )}
               {activeScreen === 8 && (
                 <OrganogramaScreen history={history} />
@@ -461,11 +602,15 @@ export default function App() {
                   history={history}
                   setHistory={setHistory}
                   onDeleteSelected={deleteHistory}
+                  onImportBackup={handleImportBackup}
                   onExportPDF={exportToPDF}
                   onExportExcel={exportToExcel}
                   onExportWhatsApp={exportToWhatsApp}
                   onExportCompiledPDF={generateCompiledReportPDFBlob}
                   onEdit={handleEditVisit}
+                  user={user}
+                  onResetFromCloud={handleResetFromCloud}
+                  onPushToCloud={handlePushToCloud}
                 />
               )}
               {activeScreen === 7 && viewingVisit && (

@@ -4,7 +4,6 @@ import * as XLSX from 'xlsx';
 import { VisitData } from '../types';
 import { formatDateBR, getIdealTempRange, calculateHousingDays } from './utils';
 import { calculateVisitResults } from './scoring';
-import AppLogo from '../assets/images/regenerated_image_1781570211120.png';
 
 // Extending jsPDF with autotable types
 declare module 'jspdf' {
@@ -22,44 +21,23 @@ export async function exportToPDF(records: VisitData[]) {
   const H = doc.internal.pageSize.getHeight();
   const margin = 14;
 
-  const img = new window.Image();
-  img.src = AppLogo;
-  await new Promise((resolve) => {
-    img.onload = resolve;
-    img.onerror = resolve; // Continue even if image fails to load
-  });
-
   records.forEach((d, idx) => {
     if (idx > 0) doc.addPage();
     let y = 14;
 
-    // Header Branding with Image Base
-    const headerHeight = 36;
+    // Header Branding
+    const headerHeight = 28;
     
-    try {
-      doc.addImage(img, 'PNG', 0, 0, W, headerHeight);
-      
-      // Setup overlay for readability
-      doc.setFillColor(15, 23, 42); // match dark theme
-      doc.setGState(new (doc.GState as any)({ opacity: 0.85 }));
-      doc.rect(0, 0, W, headerHeight, 'F');
-      doc.setGState(new (doc.GState as any)({ opacity: 1.0 }));
-    } catch {
-      // Fallback if image base doesn't work
-      doc.setFillColor(15, 23, 42);
-      doc.rect(0, 0, W, headerHeight, 'F');
-    }
+    doc.setFillColor(15, 23, 42); // match dark theme
+    doc.rect(0, 0, W, headerHeight, 'F');
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('SUINO SAÚDE', margin, 18);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA', margin, 24);
+    doc.text('RELATÓRIO DE AVALIAÇÃO SANITÁRIA', margin, 18);
 
     doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
     doc.text('Data da Visita: ' + formatDateBR(d.date), W - margin, 18, { align: 'right' });
     
     if (records.length > 1) {
@@ -123,7 +101,7 @@ export async function exportToPDF(records: VisitData[]) {
     
     // Tiny label on the right of the score bar
     doc.setFontSize(7);
-    doc.text('ÍNDICE CALCULADO PELO ALGORITMO SUINOSAÚDE', W - margin - 5, y + 9, { align: 'right' });
+    doc.text('ÍNDICE CALCULADO COM BASE NOS INDICADORES', W - margin - 5, y + 9, { align: 'right' });
     y += 24;
 
     // III. Environmental Analysis (Only if at least one parameter is present)
@@ -274,13 +252,13 @@ export async function exportToPDF(records: VisitData[]) {
     // Professional Disclaimer
     doc.setFontSize(6.5);
     doc.setTextColor(150, 150, 150);
-    const disclaimer = "Este documento é um relatório técnico gerado pelo sistema SuinoSaúde. As conclusões baseiam-se em amostragem clínica realizada no momento da visita. Este relatório não substitui o diagnóstico laboratorial definitivo quando necessário.";
+    const disclaimer = "Este documento é um relatório técnico onde as conclusões baseiam-se em análise clínica realizada no momento da visita. Este relatório não substitui o diagnóstico laboratorial definitivo quando necessário.";
     doc.text(disclaimer, margin, H - 12, { maxWidth: W - (margin * 2) });
   });
 
   const finalName = records.length === 1 
-    ? `SuinoSaude_Relatorio_${records[0].producer.replace(/\s+/g, '_')}_${formatDateBR(records[0].date).replace(/\//g, '-')}.pdf`
-    : `SuinoSaude_Export_Consolidado_${records.length}_Visitas.pdf`;
+    ? `Relatorio_Avaliacao_${records[0].producer.replace(/\s+/g, '_')}_${formatDateBR(records[0].date).replace(/\//g, '-')}.pdf`
+    : `Export_Consolidado_${records.length}_Visitas.pdf`;
 
   doc.save(finalName);
 }
@@ -592,37 +570,20 @@ export async function generateCompiledReportPDFBlob(records: VisitData[]): Promi
   const H = doc.internal.pageSize.getHeight();
   const margin = 14;
 
-  const img = new window.Image();
-  img.src = AppLogo;
-  await new Promise((resolve) => {
-    img.onload = resolve;
-    img.onerror = resolve;
-  });
-
-  const headerHeight = 36;
-  try {
-    doc.addImage(img, 'PNG', 0, 0, W, headerHeight);
-    doc.setFillColor(15, 23, 42); // match dark theme
-    doc.setGState(new (doc.GState as any)({ opacity: 0.85 }));
-    doc.rect(0, 0, W, headerHeight, 'F');
-    doc.setGState(new (doc.GState as any)({ opacity: 1.0 }));
-  } catch {
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, W, headerHeight, 'F');
-  }
+  const headerHeight = 28;
+  doc.setFillColor(15, 23, 42); // match dark theme
+  doc.rect(0, 0, W, headerHeight, 'F');
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('SUINO SAÚDE', margin, 18);
-  
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text('RELATÓRIO DESCRITIVO COMPILADO', margin, 24);
+  doc.text('RELATÓRIO DESCRITIVO COMPILADO', margin, 18);
 
   const dateStr = new Date().toLocaleDateString('pt-BR');
-  doc.text(`Data de Geração: ${dateStr}`, margin, 30);
-  doc.text(`${records.length} Lotes Selecionados`, W - margin, 30, { align: 'right' });
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Data de Geração: ${dateStr}`, margin, 24);
+  doc.text(`${records.length} Lotes Selecionados`, W - margin, 18, { align: 'right' });
 
   doc.setTextColor(15, 23, 42);
   let y = headerHeight + 10;
@@ -700,6 +661,15 @@ export async function generateCompiledReportPDFBlob(records: VisitData[]): Promi
       doc.line(margin, y - 4, W - margin, y - 4);
       y += 6;
     }
+  }
+
+  const pageCount = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(6.5);
+    doc.setTextColor(150, 150, 150);
+    const disclaimer = "Este documento é um relatório técnico onde as conclusões baseiam-se em análise clínica realizada no momento da visita. Este relatório não substitui o diagnóstico laboratorial definitivo quando necessário.";
+    doc.text(disclaimer, margin, H - 12, { maxWidth: W - (margin * 2) });
   }
 
   return URL.createObjectURL(doc.output('blob'));

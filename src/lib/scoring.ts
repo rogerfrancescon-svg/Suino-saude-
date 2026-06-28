@@ -103,12 +103,16 @@ export function calculateVisitResults(data: Partial<VisitData>) {
   if (mortalityRate > 0) {
     if (proportionalMeta > 0 && mortalityRate <= proportionalMeta) {
       scoreBreakdown.mortalityDeduction = mortalityRate * (10 / proportionalMeta);
-      scoreBreakdown.mortalityDesc = `Mortalidade dentro da meta prop. (${proportionalMeta.toFixed(2)}%): Deducão proporcional até 10 pts`;
+      scoreBreakdown.mortalityDesc = elapsedDays === 0 ?
+        `Mortalidade aceitável para meta final (${proportionalMeta.toFixed(2)}%): Dedução proporcional até 10 pts` :
+        `Mortalidade dentro da meta prop. (${proportionalMeta.toFixed(2)}%): Deducão proporcional até 10 pts`;
     } else {
       const base = proportionalMeta > 0 ? 10 : 0;
       const meta = proportionalMeta > 0 ? proportionalMeta : 0;
       scoreBreakdown.mortalityDeduction = Math.min(30, base + 5 + (mortalityRate - meta) * 8);
-      scoreBreakdown.mortalityDesc = `Mortalidade > Meta prop. (${meta.toFixed(2)}%): Meta ultrapassada (-5 pts), -${base + 5} pts base + 8 pts por % extra (máx 30)`;
+      scoreBreakdown.mortalityDesc = elapsedDays === 0 ?
+        `Mortalidade > Meta final (${meta.toFixed(2)}%): Meta ultrapassada (-5 pts), -${base + 5} pts base + 8 pts por % extra (máx 30)` :
+        `Mortalidade > Meta prop. (${meta.toFixed(2)}%): Meta ultrapassada (-5 pts), -${base + 5} pts base + 8 pts por % extra (máx 30)`;
     }
   }
 

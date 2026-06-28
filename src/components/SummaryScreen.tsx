@@ -31,9 +31,9 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
   ];
 
   const pieData = [
-    { name: 'Escore 1', value: results.e1p, color: '#10b981' },
-    { name: 'Escore 2', value: results.e2p, color: '#f59e0b' },
-    { name: 'Escore 3', value: results.e3p, color: '#f43f5e' },
+    { name: 'E1', value: results.e1p, color: '#10b981' },
+    { name: 'E2', value: results.e2p, color: '#f59e0b' },
+    { name: 'E3', value: results.e3p, color: '#f43f5e' },
   ];
 
   const alerts = [];
@@ -206,8 +206,8 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
           {/* Identificação */}
           <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Identificação</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Produtor / Granja</p>
                 <p className="font-medium">{data.producer || '-'} {data.farm ? `— ${data.farm}` : ''}</p>
               </div>
@@ -229,8 +229,8 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
           {/* Dados Produtivos */}
           <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Dados Produtivos</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Animais Alojados</p>
                 <p className="font-medium">{data.totalAnimals || '-'}</p>
               </div>
@@ -247,7 +247,7 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade Atual</p>
+                <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Mortalidade</p>
                 <p className="font-medium text-brand-danger">{data.mortality || '0'} ({results.mortalityRate?.toFixed(2) || '0.00'}%)</p>
               </div>
             </div>
@@ -271,7 +271,7 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
           {/* Ambiente e Sinais Clínicos Básicos */}
           <div className="card rounded-xl p-5 space-y-4 text-sm text-[var(--text-main)] select-text">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-brand-primary border-b border-[var(--border)] pb-2 mb-3">Ambiente & Sinais Clínicos</h4>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wider font-bold">Temperatura</p>
                 <p className="font-medium">{data.temp ? `${data.temp}°C` : '-'}</p>
@@ -462,17 +462,18 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
+                      innerRadius={50}
+                      outerRadius={75}
                       paddingAngle={5}
                       dataKey="value"
+                      label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''}
+                      labelLine={false}
                    >
                       {pieData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                    </Pie>
-                   <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', fontSize: '12px' }} />
-                   <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
+                   <Tooltip contentStyle={{ backgroundColor: 'var(--surface)', border: '1px solid var(--border)', fontSize: '12px', borderRadius: '8px' }} />
                 </PieChart>
              </ResponsiveContainer>
           </div>
@@ -494,11 +495,11 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
 
       {/* Notes */}
       {data.notes && (
-        <div className="card rounded-xl p-5 space-y-3 border-l-4 border-l-brand-primary">
+        <div className="card rounded-xl p-6 space-y-4 border-l-4 border-l-brand-primary">
           <h4 className="text-xs font-bold uppercase text-[var(--text-muted)] flex items-center gap-2">
             📝 Observações da Visita
           </h4>
-          <div className="p-4 bg-[var(--bg)]/50 rounded-lg border border-[var(--border)] text-sm text-[var(--text-main)] italic whitespace-pre-wrap">
+          <div className="p-5 bg-[var(--bg)]/50 rounded-lg border border-[var(--border)] text-[13px] text-[var(--text-main)] leading-loose tracking-wide whitespace-pre-wrap text-left font-medium">
             {data.notes}
           </div>
         </div>
@@ -509,14 +510,14 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
       <div id="summary-export-image-target" style={{ position: 'absolute', left: 0, top: 0, width: '800px', backgroundColor: 'var(--bg)', padding: '24px', borderRadius: '16px', pointerEvents: 'none', opacity: isExporting ? 1 : 0, zIndex: -50 }} className="space-y-6">
         <div className="flex items-center justify-between border-b border-[var(--border)] pb-4">
           <div>
-            <h2 className="text-2xl font-bold" style={{ color: '#111827' }}>Painel de Resumo Sanitário</h2>
-            <p className="text-sm font-medium text-[var(--text-muted)] mt-1">
+            <h2 className="text-3xl font-bold" style={{ color: '#111827' }}>Painel de Resumo Sanitário</h2>
+            <p className="text-lg font-medium text-[var(--text-muted)] mt-1">
               {data.producer || 'Produtor Sem Nome'} {data.farm ? `— ${data.farm}` : ''} | {data.date ? formatDateBR(data.date) : 'Data N/A'}
             </p>
           </div>
           <div className="text-right">
-             <p className="text-xs uppercase font-bold text-[var(--text-muted)]">Idade do Lote</p>
-             <p className="text-lg font-black" style={{ color: '#3b82f6' }}>{data.housingDate && data.date ? `${calculateHousingDays(data.housingDate, data.date)} dias` : '-'}</p>
+             <p className="text-base uppercase font-bold text-[var(--text-muted)]">Idade do Lote</p>
+             <p className="text-2xl font-black" style={{ color: '#3b82f6' }}>{data.housingDate && data.date ? `${calculateHousingDays(data.housingDate, data.date)} dias` : '-'}</p>
           </div>
         </div>
         
@@ -527,10 +528,10 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
                results.score >= 70 ? { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.2)', color: '#f59e0b' } : 
                { backgroundColor: 'rgba(244, 63, 94, 0.1)', borderColor: 'rgba(244, 63, 94, 0.2)', color: '#f43f5e' }
              }>
-              <p className="text-[12px] font-bold tracking-widest uppercase mb-1 opacity-80 z-10">Índice Geral de Sanidade</p>
+              <p className="text-sm font-bold tracking-widest uppercase mb-1 opacity-80 z-10">Índice Geral de Sanidade</p>
               <div className="flex items-baseline gap-2 z-10 mb-2">
-                 <span className="text-5xl font-black leading-none tracking-tighter">{results.score}</span>
-                 <span className="text-lg font-bold opacity-60">/100</span>
+                 <span className="text-7xl font-black leading-none tracking-tighter">{results.score}</span>
+                 <span className="text-2xl font-bold opacity-60">/100</span>
               </div>
               <div className="mt-1 inline-block px-3 py-1 rounded-full z-10 border self-start"
                  style={
@@ -538,7 +539,7 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
                   results.score >= 70 ? { backgroundColor: 'rgba(245, 158, 11, 0.2)', borderColor: 'rgba(245, 158, 11, 0.3)' } : 
                   { backgroundColor: 'rgba(244, 63, 94, 0.2)', borderColor: 'rgba(244, 63, 94, 0.3)' }
                  }>
-                 <span className="text-sm font-black tracking-widest uppercase" style={{ color: 'inherit' }}>{results.scoreStatus}</span>
+                 <span className="text-xl font-black tracking-widest uppercase" style={{ color: 'inherit' }}>{results.scoreStatus}</span>
               </div>
           </div>
 
@@ -547,13 +548,13 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
               <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex items-center gap-4 flex-1">
                 <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><Activity size={24} /></div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Temperatura</p>
-                  <p className="text-xl font-black text-[var(--text-main)]">{data.temp}°C</p>
+                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Temperatura</p>
+                  <p className="text-3xl font-black text-[var(--text-main)]">{data.temp}°C</p>
                 </div>
               </div>
             ) : (
               <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-xl flex-1 flex items-center justify-center opacity-60">
-                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados térmicos</p>
+                 <p className="text-base font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados térmicos</p>
               </div>
             )}
             
@@ -561,13 +562,13 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
               <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-2xl flex items-center gap-4 flex-1">
                 <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}><AirVent size={24} /></div>
                 <div>
-                  <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Concentração CO2</p>
-                  <p className="text-xl font-black text-[var(--text-main)]">{data.co2} ppm</p>
+                  <p className="text-sm font-bold text-[var(--text-muted)] uppercase tracking-wider">Concentração CO2</p>
+                  <p className="text-3xl font-black text-[var(--text-main)]">{data.co2} ppm</p>
                 </div>
               </div>
              ) : (
               <div className="bg-[var(--surface)] border border-[var(--border)] p-4 rounded-xl flex-1 flex items-center justify-center opacity-60">
-                 <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados ventilatórios</p>
+                 <p className="text-base font-bold uppercase tracking-wider text-[var(--text-main)]">Sem dados ventilatórios</p>
               </div>
             )}
           </div>
@@ -575,15 +576,15 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
 
         <div className="grid grid-cols-2 gap-6 pb-2">
           <div className="card rounded-xl p-5 bg-[var(--surface)] border border-[var(--border)]">
-            <h4 className="text-[10px] font-bold uppercase text-[var(--text-muted)] mb-4">Frequências vs. Limiares (%)</h4>
+            <h4 className="text-sm font-bold uppercase text-[var(--text-muted)] mb-4">Frequências vs. Limiares (%)</h4>
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={barData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.5} />
-                   <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={11} tick={{ fill: 'var(--text-main)' }} />
-                   <YAxis tickCount={5} axisLine={false} tickLine={false} fontSize={11} tick={{ fill: 'var(--text-main)' }} />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={14} tick={{ fill: 'var(--text-main)' }} />
+                   <YAxis tickCount={5} axisLine={false} tickLine={false} fontSize={14} tick={{ fill: 'var(--text-main)' }} />
                    <Bar dataKey="value" radius={[4, 4, 0, 0]} isAnimationActive={false}>
-                     <LabelList dataKey="value" position="top" offset={10} fontSize={10} fill="var(--text-main)" fontWeight="bold" formatter={(v: number) => `${v.toFixed(1)}%`} />
+                     <LabelList dataKey="value" position="top" offset={10} fontSize={14} fill="var(--text-main)" fontWeight="bold" formatter={(v: number) => `${v.toFixed(1)}%`} />
                        {barData.map((entry, index) => (
                          <Cell key={`cell-${index}`} fill={entry.value >= entry.threshold && entry.threshold > 0 ? '#f43f5e' : '#14b8a6'} />
                        ))}
@@ -594,19 +595,27 @@ export default function SummaryScreen({ data, results, onPrev, onSave, onClear, 
             </div>
           </div>
           <div className="card rounded-xl p-5 bg-[var(--surface)] border border-[var(--border)]">
-            <h4 className="text-[10px] font-bold uppercase text-[var(--text-muted)] mb-4">Escores Fecais (%)</h4>
+            <h4 className="text-sm font-bold uppercase text-[var(--text-muted)] mb-4">Escores Fecais (%)</h4>
             <div className="h-[200px]">
                <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" isAnimationActive={false}>
+                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={2} dataKey="value" isAnimationActive={false} label={({ name, percent }) => percent > 0 ? `${name} ${(percent * 100).toFixed(0)}%` : ''} labelLine={false}>
                         {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                      </Pie>
-                     <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px', color: 'var(--text-main)' }} />
                   </PieChart>
                </ResponsiveContainer>
             </div>
           </div>
         </div>
+
+        {data.notes && (
+          <div className="card rounded-xl p-5 bg-[var(--surface)] border border-[var(--border)] mt-4">
+            <h4 className="text-sm font-bold uppercase text-[var(--text-muted)] mb-2">📌 Observações de Campo / Notas do Lote</h4>
+            <div className="text-lg font-medium leading-relaxed tracking-wide whitespace-pre-wrap text-justify" style={{ color: '#9ca3af' }}>
+              {data.notes}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4 pt-4">

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { VisitData, Phase } from '../types';
 import { 
-  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, ZAxis, Cell
+  ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList, ZAxis, Cell, ReferenceArea
 } from 'recharts';
 import { Layers } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -12,6 +12,20 @@ interface Props {
 
 export default function OrganogramaScreen({ history }: Props) {
   const [selectedPhase, setSelectedPhase] = useState<Phase | 'Todas'>('Todas');
+
+  const abbreviateName = (name: string) => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 10) + (parts[0].length > 10 ? '.' : '');
+    return `${parts[0].substring(0, 8)} ${parts[parts.length - 1].charAt(0)}.`;
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 3).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   // Obter apenas as visitas mais recentes (lotes em andamento) para cada combinação Produtor+Granja+Lote
   const todosLotesEmAndamento = useMemo(() => {
@@ -36,11 +50,15 @@ export default function OrganogramaScreen({ history }: Props) {
             ageDays = Math.max(0, Math.round((time2 - time1) / (1000 * 60 * 60 * 24)));
             }
         }
+        const abbreviatedFarm = abbreviateName(d.farm);
+        const abbreviatedProducer = abbreviateName(d.producer);
+        const initials = getInitials(d.farm) || getInitials(d.producer);
         return {
             ...d,
             ageDays,
-            label: `${d.producer} - ${d.farm}${d.batch ? ` Lote: ${d.batch}` : ''}`,
-            shortLabel: d.farm || d.producer,
+            ageStr: d.housingDate ? `${ageDays} dias` : 'Idade N/A',
+            label: `${abbreviatedProducer} - ${abbreviatedFarm}${d.batch ? ` Lote: ${d.batch}` : ''}`,
+            shortLabel: initials,
             score: d.results.score,
         };
       })
@@ -101,6 +119,12 @@ export default function OrganogramaScreen({ history }: Props) {
             <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} stroke="var(--border)" />
+                {/* @ts-ignore */}
+                <ReferenceArea y1={0} y2={70} fill="#da3633" fillOpacity={0.05} />
+                {/* @ts-ignore */}
+                <ReferenceArea y1={70} y2={85} fill="#d29922" fillOpacity={0.05} />
+                {/* @ts-ignore */}
+                <ReferenceArea y1={85} y2={100} fill="#2ea043" fillOpacity={0.05} />
                 <XAxis 
                     type="number" 
                     dataKey="ageDays" 
@@ -121,7 +145,7 @@ export default function OrganogramaScreen({ history }: Props) {
                     axisLine={{ stroke: 'var(--border)' }}
                     tickLine={false}
                 />
-                <ZAxis type="number" range={[400, 400]} />
+                <ZAxis type="number" range={[1000, 1000]} />
                 <Tooltip 
                     cursor={{ strokeDasharray: '3 3' }}
                     content={({ active, payload }) => {
@@ -132,7 +156,7 @@ export default function OrganogramaScreen({ history }: Props) {
                                     <p className="font-bold text-sm text-[var(--text-main)] mb-1">{data.label}</p>
                                     <p className="text-xs text-[var(--text-dim)] mb-1">Fase: <span className="font-semibold text-[var(--text-main)]">{data.phase}</span></p>
                                     <p className="text-xs text-[var(--text-dim)] mb-1">Ração: <span className="font-semibold text-[var(--text-main)]">{data.feed || 'ND'}</span></p>
-                                    <p className="text-xs text-[var(--text-dim)] mb-2">Idade: <span className="font-semibold text-[var(--text-main)]">{data.ageDays} dias</span></p>
+                                    <p className="text-xs text-[var(--text-dim)] mb-2"> <span className="font-semibold text-[var(--text-main)]">{data.ageStr}</span></p>
                                     <p className="text-xs text-[var(--text-dim)] mb-1">Medic.: <span className="font-semibold text-[var(--text-main)]">{data.meds || 'Nenhuma'}</span></p>
                                     <div className="mt-2 pt-2 border-t border-[var(--border)] flex items-center justify-between">
                                         <span className="text-xs font-bold text-[var(--text-muted)] uppercase">Score</span>
@@ -149,16 +173,13 @@ export default function OrganogramaScreen({ history }: Props) {
                 />
                 <Scatter name="Lotes" data={lotesEmAndamento}>
                     {lotesEmAndamento.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.score >= 85 ? '#2ea043' : entry.score >= 70 ? '#d29922' : '#da3633'} />
+                        <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.score >= 85 ? '#2ea043' : entry.score >= 70 ? '#d29922' : '#da3633'} 
+                            stroke="var(--surface)"
+                            strokeWidth={2}
+                        />
                     ))}
-                    <LabelList 
-                        dataKey="shortLabel" 
-                        position="top" 
-                        offset={15} 
-                        fill="var(--text-main)" 
-                        fontSize={10} 
-                        fontWeight="bold" 
-                    />
                 </Scatter>
             </ScatterChart>
             </ResponsiveContainer>
@@ -182,8 +203,8 @@ export default function OrganogramaScreen({ history }: Props) {
                 {lotesEmAndamento.map((lote) => (
                     <tr key={lote.id} className="hover:bg-[var(--surface-hover)] transition-colors">
                         <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-brand-primary">{lote.producer || 'Sem Nome'}</p>
-                            <p className="text-[10px] text-[var(--text-dim)] uppercase font-medium">{lote.farm || 'N/A'}{lote.batch ? ` • LOTE ${lote.batch}` : ''}</p>
+                            <p className="text-sm font-bold text-brand-primary">{abbreviateName(lote.producer) || 'Sem Nome'}</p>
+                            <p className="text-[10px] text-[var(--text-dim)] uppercase font-medium">{abbreviateName(lote.farm) || 'N/A'}{lote.batch ? ` • LOTE ${lote.batch}` : ''}</p>
                         </td>
                         <td className="px-6 py-4">
                             <span className="px-3 py-1 bg-brand-primary/10 text-brand-primary rounded-full text-xs font-black">
