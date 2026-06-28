@@ -54,7 +54,6 @@ export interface VisitData {
   };
   notes?: string;
   images?: string[];
-  isOfflinePending?: boolean;
 }
 
 export interface AppState {

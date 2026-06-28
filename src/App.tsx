@@ -27,10 +27,6 @@ import PwaPrompt from './components/PwaPrompt';
 
 import { getSeededVisits } from './lib/seed';
 
-import { loginWithGoogle, logoutGoogle, useFirestoreSync } from './lib/sync';
-import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
-import { db } from './lib/firebase';
-
 const INITIAL_VISIT: Partial<VisitData> = {
   date: new Date().toISOString().split('T')[0],
   counts: { cough: 0, sneeze: 0, e2: 0, e3: 0 },
@@ -171,60 +167,6 @@ export default function App() {
   });
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  const { user, saveVisitToFirestore, deleteVisitsFromFirestore } = useFirestoreSync(history, setHistory);
-
-  const handleResetFromCloud = async () => {
-    if (!user) {
-      showToast("Você precisa estar conectado à nuvem para fazer isso.", "error");
-      return;
-    }
-    try {
-      showToast("Buscando dados da nuvem...", "success");
-      const querySnapshot = await getDocs(collection(db, `users/${user.uid}/history`));
-      const remoteData: VisitData[] = [];
-      querySnapshot.forEach((doc) => {
-        remoteData.push(doc.data() as VisitData);
-      });
-      
-      const seedIds = getSeededVisits().map(s => s.id);
-      
-      // Reset pending tag for seeded records but do not overwrite user edits
-      const correctedRemote = remoteData.map(v => {
-        return { ...v, isOfflinePending: false };
-      });
-
-      const sorted = correctedRemote.sort((a, b) => b.id - a.id);
-      setHistory(sorted);
-      showToast("Tabelas da nuvem baixadas e sincronizadas com sucesso!", "success");
-    } catch (error) {
-      console.error("Failed to reset from cloud", error);
-      showToast("Falha ao baixar dados da nuvem.", "error");
-    }
-  };
-
-  const handlePushToCloud = async () => {
-    if (!user) {
-      showToast("Você precisa estar conectado à nuvem para fazer isso.", "error");
-      return;
-    }
-    try {
-      showToast("Enviando dados locais para a nuvem...", "success");
-      const batchRequests = history.map(async (visit) => {
-        const docRef = doc(db, `users/${user.uid}/history`, visit.id.toString());
-        // Upload without the offline pending tag
-        const visitToUpload = { ...visit, isOfflinePending: false };
-        await setDoc(docRef, visitToUpload);
-      });
-      await Promise.all(batchRequests);
-      // Clear offline pending status locally
-      setHistory(prev => prev.map(v => ({ ...v, isOfflinePending: false })));
-      showToast("Todo o histórico local foi salvo na nuvem com sucesso!", "success");
-    } catch (error) {
-      console.error("Failed to push to cloud", error);
-      showToast("Falha ao enviar dados locais para a nuvem.", "error");
-    }
-  };
-
   // Persistence
   useEffect(() => {
     try {
@@ -298,8 +240,7 @@ export default function App() {
     const visitToSave: VisitData = {
       ...(currentVisit as VisitData),
       id: isEdit ? currentVisit.id! : Date.now(),
-      results,
-      isOfflinePending: true // Set to true initial state; cleared when successfully synced
+      results
     };
 
     if (isEdit) {
@@ -308,10 +249,6 @@ export default function App() {
     } else {
       setHistory(prev => [...prev, visitToSave]);
       showToast('Visita salva com sucesso!');
-    }
-    
-    if (user) {
-      saveVisitToFirestore(visitToSave);
     }
     
     setCurrentVisit(INITIAL_VISIT);
@@ -326,17 +263,11 @@ export default function App() {
 
   const deleteHistory = (ids: number[]) => {
     setHistory(prev => prev.filter(h => !ids.includes(h.id)));
-    if (user) {
-      deleteVisitsFromFirestore(ids);
-    }
     showToast('Registros removidos.');
   };
 
   const handleImportBackup = (merged: VisitData[]) => {
     setHistory(merged);
-    if (user) {
-        merged.forEach(visit => saveVisitToFirestore(visit));
-    }
   };
 
   const results = calculateVisitResults(currentVisit);
@@ -437,25 +368,6 @@ export default function App() {
           </nav>
 
           <div className="p-5 border-t border-[var(--border)] pt-4 mt-auto">
-            {user ? (
-               <button 
-                  onClick={logoutGoogle}
-                  className="w-full flex items-center justify-between px-3 py-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-brand-success-light hover:bg-[var(--surface-hover)] transition-colors rounded-md border border-brand-success-light/20 bg-brand-success/10"
-               >
-                 <span className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-brand-success animate-pulse" /> Sincronizado
-                 </span>
-                 Sair
-               </button>
-            ) : (
-               <button 
-                  id="google-login-btn"
-                  onClick={loginWithGoogle}
-                  className="w-full flex items-center gap-3 px-3 py-2 mb-2 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-brand-primary transition-colors bg-[var(--surface-hover)] rounded-md border border-[var(--border)]"
-               >
-                 Acessar Nuvem para Sincronizar
-               </button>
-            )}
             <button 
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className="w-full flex items-center gap-3 px-3 py-2 mb-4 text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--accent-primary)] transition-colors bg-[var(--surface-hover)] rounded-md"
@@ -464,7 +376,7 @@ export default function App() {
               Alternar Tema
             </button>
             <p className="text-[10px] text-[var(--text-dim)] leading-relaxed">
-              {user ? 'Modo Online Ativo ✓' : 'Modo Offline Ativo ✓'}<br/>
+              Modo Offline Ativo ✓<br/>
               <span className="font-semibold text-[var(--text-muted)]">v2.4.0-stable</span>
             </p>
           </div>
@@ -494,33 +406,12 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-2 pr-12 md:pr-0">
-            {user ? (
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-brand-success animate-pulse" />
-                <span className="text-[10px] font-bold text-brand-success-light uppercase hidden sm:inline md:inline">
-                  Sincronizado: {user.email}
-                </span>
-                <button
-                  onClick={logoutGoogle}
-                  className="px-2 py-1 text-[9px] font-extrabold uppercase bg-brand-danger/10 text-brand-danger border border-brand-danger/25 hover:bg-brand-danger/20 transition-all rounded cursor-pointer"
-                >
-                  Sair
-                </button>
-              </div>
-            ) : (
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                 <span className="text-[10px] font-bold text-amber-500 uppercase hidden sm:inline md:inline mr-1">
-                  Modo Offline (Sem Sincronia)
+                  Modo Local (Offline)
                 </span>
-                <button 
-                  onClick={loginWithGoogle}
-                  className="px-2.5 py-1 text-[9px] font-extrabold uppercase bg-brand-primary text-black transition-all rounded shadow-md hover:bg-brand-primary-light cursor-pointer"
-                >
-                  Sincronizar no Celular
-                </button>
               </div>
-            )}
           </div>
         </header>
 
@@ -608,9 +499,6 @@ export default function App() {
                   onExportWhatsApp={exportToWhatsApp}
                   onExportCompiledPDF={generateCompiledReportPDFBlob}
                   onEdit={handleEditVisit}
-                  user={user}
-                  onResetFromCloud={handleResetFromCloud}
-                  onPushToCloud={handlePushToCloud}
                 />
               )}
               {activeScreen === 7 && viewingVisit && (

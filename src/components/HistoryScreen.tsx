@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VisitData } from '../types';
-import { FileText, Table as TableIcon, MessageSquare, Trash2, CheckSquare, Square, Download, Upload, AlertCircle, X, Copy, Database, RefreshCw, Cloud } from 'lucide-react';
+import { FileText, Table as TableIcon, MessageSquare, Trash2, CheckSquare, Square, Download, Upload, AlertCircle, X, Copy } from 'lucide-react';
 import { cn, formatDateBR, calculateHousingDays } from '../lib/utils';
 import { exportBackupToExcel, importBackupFromExcel } from '../lib/exports';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,9 +15,6 @@ interface Props {
   onExportWhatsApp: (records: VisitData[]) => void;
   onExportCompiledPDF: (records: VisitData[]) => Promise<string>;
   onEdit: (visit: VisitData) => void;
-  user?: any;
-  onResetFromCloud?: () => void;
-  onPushToCloud?: () => void;
 }
 
 export default function HistoryScreen({ 
@@ -29,10 +26,7 @@ export default function HistoryScreen({
   onExportExcel, 
   onExportWhatsApp, 
   onExportCompiledPDF, 
-  onEdit,
-  user,
-  onResetFromCloud,
-  onPushToCloud
+  onEdit
 }: Props) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
@@ -228,83 +222,6 @@ export default function HistoryScreen({
         </div>
       </div>
 
-      {/* Cloud Synchronisation Management */}
-      <div className="card rounded-xl p-5 space-y-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
-          <Cloud size={16} className={cn(user ? "text-brand-success" : "text-amber-500")} /> 
-          Nuvem Suino Saúde e Sincronismo
-        </h3>
-        
-        {user ? (
-          <div className="space-y-4">
-            <div className="bg-brand-success/10 border border-brand-success/20 p-4 rounded-xl space-y-2">
-              <p className="text-xs text-brand-success-light font-bold flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-brand-success animate-pulse inline-block" />
-                DADOS SINCRONIZADOS NA NUVEM
-              </p>
-              <p className="text-xs text-[var(--text-muted)]">
-                Você está conectado com a conta <strong className="text-slate-100">{user.email}</strong>. 
-                Qualquer modificação, criação ou deleção de visita neste dispositivo é transmitida em tempo real para a nuvem e compartilhada com os demais celulares/computadores conectados na mesma conta.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <div>
-                  <h4 className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-muted)] text-[var(--text-main)]">Substituir Local por Nuvem</h4>
-                  <p className="text-[10px] text-[var(--text-dim)]">Caso as informações do celular pareçam desatualizadas ou inconsistentes.</p>
-                </div>
-                <button 
-                  onClick={onResetFromCloud}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--surface-hover)] border border-[var(--border)] hover:bg-brand-primary hover:text-black text-[var(--text-main)] hover:border-transparent text-xs font-bold rounded-lg transition-all cursor-pointer"
-                >
-                  <RefreshCw size={14} /> Re-baixar Dados da Nuvem
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <div>
-                  <h4 className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-muted)] text-[var(--text-main)]">Forçar Envio Local → Nuvem</h4>
-                  <p className="text-[10px] text-[var(--text-dim)]">Caso tenha feito visitas offline e queira garantir que subiram para a nuvem.</p>
-                </div>
-                <button 
-                  onClick={onPushToCloud}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-[var(--surface-hover)] border border-[var(--border)] hover:border-brand-success hover:bg-brand-success/15 hover:text-brand-success-light text-[var(--text-main)] text-xs font-bold rounded-lg transition-all cursor-pointer"
-                >
-                  <Database size={14} /> Forçar Envio para Nuvem
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl space-y-3">
-            <p className="text-xs text-amber-500 font-bold flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse inline-block" />
-              SESSÃO APENAS LOCAL (OFFLINE)
-            </p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              O celular está rodando no modo local. Qualquer alteração ou inserção feita no celular <strong className="text-amber-500">NÃO aparecerá na Web</strong> (ou em outros aparelhos) do Suino Saúde até que você associe uma conta de Sincronia.
-            </p>
-            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-              Clique no botão abaixo para conectar-se com sua conta Google e ativar a sincronização instantânea.
-            </p>
-            <button 
-              onClick={() => {
-                const syncBtn = document.getElementById('google-login-btn');
-                if (syncBtn) {
-                  syncBtn.click();
-                } else {
-                  alert("Por favor, clique no botão 'Sincronizar no Celular' ou 'Acessar Nuvem para Sincronizar' para fazer login.");
-                }
-              }}
-              className="px-4 py-2 bg-brand-primary text-black text-xs font-bold rounded-lg hover:bg-brand-primary-light transition-colors shadow-md flex items-center gap-2 cursor-pointer"
-            >
-              <Cloud size={14} /> Ativar Sincronização Agora
-            </button>
-          </div>
-        )}
-      </div>
-
       <div className="card rounded-xl p-5 space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-2">
           📊 Sincronização por Planilha (Backup Offline)
@@ -392,9 +309,7 @@ export default function HistoryScreen({
                 "card rounded-xl p-4 transition-all border-l-4 group border border-transparent",
                 selectedIds.includes(v.id) 
                   ? "border-[var(--brand-primary)] bg-brand-primary/5" 
-                  : v.isOfflinePending 
-                    ? "border-l-amber-500 bg-amber-500/[0.03] border-amber-500/20 shadow-[0_0_12px_rgba(245,158,11,0.03)]" 
-                    : "border-l-transparent"
+                  : "border-l-transparent"
               )}
             >
               <div className="flex gap-4">
@@ -415,12 +330,6 @@ export default function HistoryScreen({
                     </div>
                     
                     <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                      {v.isOfflinePending && (
-                        <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-1">
-                          <Cloud size={10} className="text-amber-500 animate-pulse" /> Offline / Pendente
-                        </span>
-                      )}
-                      
                       <span className={cn(
                         "px-2 py-0.5 rounded text-[9px] font-black uppercase",
                         v.results.scoreStatus === 'Excelente' ? 'bg-brand-success/20 text-brand-success-light' : 
